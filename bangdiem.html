@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bảng Điểm GDQP & AN</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
+<link rel="stylesheet" href="bangdiem.css">
+</head>
+<body>
+
+
+    
+  <!-- Upload -->
+  <div class="dropzone" id="zone">
+    <span class="ico">📂</span>
+    <h3>Kéo &amp; thả file Excel vào đây</h3>
+    <p>hoặc <span class="lnk" onclick="document.getElementById('fi').click()">nhấn để chọn file</span></p>
+    <p style="margin-top:5px;font-size:12px">Định dạng: <b>.xlsx</b>, <b>.xls</b></p>
+    <input type="file" id="fi" accept=".xlsx,.xls" style="display:none">
+    <input type="file" id="fiNoiSinh" accept=".xlsx,.xls" style="display:none">
+  </div>
+
+  <!-- File loaded banner -->
+  <div class="file-banner" id="fileBanner" style="display:none">
+    <span>
+      📄 Đã tải: <b id="loadedFileName">—</b> &ensp;·&ensp; <span id="loadedInfo"></span>
+      &ensp;|&ensp; 🌍 Nơi sinh: <b id="loadedBirthFile">Chưa có</b>
+    </span>
+    <div id="fileBannerActions" style="display:flex;align-items:center;gap:8px">
+      <button class="clr-btn" onclick="triggerNoiSinhUpload()">➕ Tải thêm file Nơi sinh</button>
+      <button class="clr-btn" onclick="clearData()">✖ Xoá &amp; tải file mới</button>
+    </div>
+  </div>
+
+  <div class="st" id="msg"></div>
+
+  <!-- Main Panel -->
+  <div id="mainPanel" style="display:none">
+
+    <!-- Selector -->
+    <div class="card">
+      <div class="ch">🔍 Tìm kiếm &amp; chọn lớp</div>
+      <div class="sel-panel">
+        <div>
+          <div class="search-box-wrap">
+            <input type="text" id="searchInput" placeholder="Tìm lớp... (VD: DA21, CKA, N01)" autocomplete="off">
+            <span class="sico">🔎</span>
+          </div>
+          <div style="margin-top:6px;font-size:11px;color:var(--muted);font-style:italic" id="listCount"></div>
+          <div class="lop-list" id="lopList"></div>
+        </div>
+        <div class="sel-summary">
+          <h4>Lớp đã chọn (<span id="selCount">0</span>)</h4>
+          <div class="sel-tags" id="selTags"><div class="sel-none">Chưa chọn lớp nào — nhấn vào lớp bên trái để thêm</div></div>
+          <div class="sel-actions">
+            <button class="mini-btn" onclick="selectAll()">✅ Chọn tất cả</button>
+            <button class="mini-btn" style="color:var(--red)" onclick="clearAll()">✖ Bỏ chọn tất cả</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outer tabs: Bảng điểm | Quyết định -->
+    <div style="margin-bottom:16px">
+      <div class="outer-tabs">
+        <button class="outer-tab on" id="otab-bd" onclick="switchOuter('bd')">📋 Bảng Điểm</button>
+        <button class="outer-tab" id="otab-qd" onclick="switchOuter('qd')">📜 Quyết Định</button>
+      </div>
+      <div class="outer-body">
+
+        <!-- Bảng điểm panel -->
+        <div id="panel-bd">
+          <div class="tabrow" id="tabrow"></div>
+          <div id="tabbody"><div class="empty" style="padding:44px">Chọn lớp bên trên để xem trước bảng điểm</div></div>
+        </div>
+
+        <!-- Quyết định panel -->
+        <div id="panel-qd" style="display:none">
+          <div class="tabrow" id="qdtabrow"></div>
+          <div id="qdtabbody"><div class="empty" style="padding:44px">Chọn lớp bên trên để xem trước quyết định</div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="acts">
+      <button class="btn btn-rst" onclick="clearData()">🔄 Tải file mới</button>
+      <button class="btn btn-dl" onclick="exportExcel('current')">📄 Xuất Bảng Điểm lớp hiện tại</button>
+      <button class="btn btn-dl" onclick="exportExcel('all')">📚 Xuất Bảng Điểm toàn bộ lớp chọn</button>
+      <button class="btn btn-qd" onclick="exportQuyetDinh('current')">📄 Xuất Quyết Định lớp hiện tại</button>
+      <button class="btn btn-qd" onclick="exportQuyetDinh('all')">📚 Xuất Quyết Định toàn bộ lớp chọn</button>
+    </div>
+  </div>
+</div>
+
+<script src="bangdiem.js"></script>
+</body>
+</html>
+
+

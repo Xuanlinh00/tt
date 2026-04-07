@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Bảng Điểm</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="hdr">
+        <div>
+            <h1>Bảng Điểm GDQP &amp; AN</h1>
+            <p class="sub">Quản lý dữ liệu lớp, môn học và xuất biểu mẫu Excel</p>
+        </div>
+        <span class="badge">Hệ thống nội bộ</span>
+    </header>
+
+    <div class="wrap">
+        <div class="container">
+
+        <section id="score-sheet" class="tab-content active card">
+            <div class="import-section" style="margin-bottom:16px">
+                <h2>Bảng Ghi Điểm</h2>
+                <div class="import-group card-soft">
+                    <h3>Dữ liệu dùng chung</h3>
+                    <p class="hint">BLD nhận dữ liệu trực tiếp từ web chính. Không cần tải file tại màn hình này.</p>
+                    <div id="gradeStatus" class="status-message"></div>
+                    <div id="studentStatus" class="status-message"></div>
+                </div>
+            </div>
+
+            <div class="filter-section report-filters">
+                <label for="reportSubjectFilter">Mã Môn:</label>
+                <select id="reportSubjectFilter">
+                    <option value="">-- Chọn Mã Môn --</option>
+                </select>
+
+                <label for="reportClassFilter">Nhóm/lớp:</label>
+                <select id="reportClassFilter">
+                    <option value="">-- Tất Cả Lớp --</option>
+                </select>
+
+                <div class="search-panel">
+                    <label for="searchInput">Tìm kiếm lớp:</label>
+                    <div class="search-box-wrap">
+                        <input id="searchInput" type="text" placeholder="Tìm lớp... (VD: DA21, CKA, N01)" autocomplete="off" />
+                        <span class="search-icon">🔎</span>
+                    </div>
+                    <div id="classSearchList" class="class-search-list"></div>
+                </div>
+
+                <div class="report-actions">
+                    <button id="selectAllClassBtn" class="btn btn-outline" type="button">Chọn tất cả</button>
+                    <button id="clearAllClassBtn" class="btn btn-outline-danger" type="button">Bỏ chọn</button>
+
+                    <button id="exportScoreSheetBtn" class="btn btn-primary" type="button">Xuất File Excel</button>
+                    <button id="exportDecisionBtn" class="btn btn-primary" type="button">Xuất Quyết Định/Chứng Chỉ</button>
+                </div>
+            </div>
+            <div id="classTags" class="class-tags"></div>
+            <div id="reportContent" class="table-wrapper">
+                <p class="empty-message">Chưa có dữ liệu. Vui lòng nhập dữ liệu từ tab "Nhập Dữ Liệu"</p>
+            </div>
+        </section>
+
+        <select id="classFilter" hidden></select>
+        <select id="subjectFilter" hidden></select>
+        <div id="byClassContent" hidden></div>
+        <div id="bySubjectContent" hidden></div>
+        <div id="statisticsContent" hidden></div>
+    </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

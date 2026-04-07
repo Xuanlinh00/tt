@@ -1,0 +1,1402 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hệ thống GDQP</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
+<style>
+:root{
+  --ink:#13213a;
+  --ink-2:#1f3359;
+  --line:#d4dceb;
+  --bg:#eef2f9;
+  --card:#ffffff;
+  --ok:#1d7a44;
+  --warn:#8a5a00;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Times New Roman",Georgia,serif;background:linear-gradient(160deg,#eef2f9,#e8edf7);color:var(--ink);min-height:100vh}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+
+.side{background:linear-gradient(180deg,#1b2a4a,#253a66);color:#fff;padding:18px 14px;border-right:2px solid #10203d}
+.brand{font-size:18px;font-weight:bold;letter-spacing:.4px;margin-bottom:18px}
+.nav{display:flex;flex-direction:column;gap:8px}
+.nav button{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;padding:10px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:14px;text-align:left}
+.nav button:hover{background:rgba(255,255,255,.16)}
+.nav button.on{background:#fff;color:var(--ink-2);font-weight:bold;border-color:#fff}
+
+.main{padding:14px}
+.topbar{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.up-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:13px}
+.btn:hover{border-color:#aebdd8;background:#f5f8ff}
+.btn-main{background:linear-gradient(135deg,#1a6f3e,#2d9b5a);color:#fff;border:none}
+.btn-main:hover{background:linear-gradient(135deg,#155c33,#27854d)}
+.btn-birth{background:linear-gradient(135deg,#7b3f00,#b85c00);color:#fff;border:none}
+.btn-birth:hover{background:linear-gradient(135deg,#652f00,#9e4e00)}
+.btn-full{background:linear-gradient(135deg,#0f5b7a,#1d7fa4);color:#fff;border:none}
+.btn-full:hover{background:linear-gradient(135deg,#0b4a63,#176982)}
+.status{font-size:13px;color:#2a3a5c}
+.status.ok{color:var(--ok)}
+.status.warn{color:var(--warn)}
+
+.panel{display:none;margin-top:12px}
+.panel.on{display:block}
+.frame-wrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+#bgdFrame{width:100%;height:calc(100vh - 110px);border:none;display:block}
+#bldFrame{width:100%;height:calc(100vh - 110px);border:none;display:block}
+.placeholder{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px;min-height:260px;display:flex;align-items:center;justify-content:center;text-align:center;color:#55617e;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+
+/* Thong ke */
+.tk-wrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 3px 10px rgba(0,0,0,.06)}
+.tk-title{font-size:14px;color:#5a6d96;font-weight:bold;letter-spacing:1px;text-transform:uppercase}
+.tk-head{font-size:28px;color:var(--ink);margin:4px 0 14px}
+.tk-layout{display:grid;grid-template-columns:320px 1fr;gap:14px;align-items:start}
+.tk-panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+.tk-panel h4{font-size:16px;color:#1b2a4a;margin-bottom:8px}
+.tk-note{font-size:13px;color:#47597f;line-height:1.45;margin-bottom:10px}
+.tk-source{font-size:13px;color:#20365f;background:#f4f8ff;border:1px solid #d4dff3;border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.tk-source b{color:#0f2d63}
+.tk-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tk-mini{border:1px solid #9aaad0;background:#fff;font-family:inherit;padding:7px 10px;font-size:13px;cursor:pointer;border-radius:7px}
+.tk-mini:hover{background:#f6f8ff}
+.tk-filter{margin-top:12px}
+.tk-search{width:100%;padding:8px 10px;border:1px solid #a8b6d5;border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:8px}
+.tk-toolbar{display:flex;gap:6px;margin-bottom:8px}
+.tk-list{border:1px solid #9fb0d6;border-radius:8px;max-height:240px;overflow:auto;padding:8px}
+.tk-item{display:flex;align-items:center;gap:7px;font-size:13px;padding:4px 0;color:#1d3058}
+.tk-item input{width:15px;height:15px}
+.tk-meta{margin-top:8px;font-size:12px;color:#4b5f88}
+.tk-main{display:flex;flex-direction:column;gap:12px}
+.tk-overview{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}
+.tk-kpi{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fbfcff}
+.tk-kpi .n{font-size:22px;font-weight:bold;color:#102a5d}
+.tk-kpi .l{font-size:12px;color:#52678f;margin-top:2px}
+.tk-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tk-stat{border:2px solid #1f1f1f;border-radius:6px;background:#fff;padding:10px 12px;font-size:14px;line-height:1.45}
+.tk-stat h5{font-size:20px;margin-bottom:6px}
+.tk-line{display:flex;justify-content:space-between;gap:10px}
+.tk-export-row{display:flex;justify-content:flex-end}
+.tk-export-btn{border:2px solid #1f1f1f;background:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:22px}
+.tk-export-btn:hover{background:#f4f7ff}
+.tk-class-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.tk-class-card{border:1px solid #ced8ef;border-radius:10px;background:#fcfdff;padding:9px 10px}
+.tk-class-card h6{font-size:14px;color:#152d5f;margin-bottom:6px}
+.tk-class-card .r{display:flex;justify-content:space-between;font-size:12.5px;color:#3f547f;line-height:1.45}
+.tk-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:#fff}
+.tk-table{width:100%;border-collapse:collapse;font-size:13px}
+.tk-table th,.tk-table td{border:1px solid #d5dff2;padding:6px 8px;text-align:center;white-space:nowrap}
+.tk-table th{background:#1e3159;color:#fff}
+.tk-table td.l{text-align:left}
+
+/* Chinh sua diem */
+.edit-wrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 3px 10px rgba(0,0,0,.06)}
+.edit-title{font-size:14px;color:#5a6d96;font-weight:bold;letter-spacing:1px;text-transform:uppercase}
+.edit-head{font-size:28px;color:var(--ink);margin:4px 0 14px}
+.edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.edit-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+.edit-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.edit-row .tk-search{margin-bottom:0}
+.edit-info{font-size:13px;color:#1d3058;line-height:1.55;border:1px solid #d5def0;background:#f8faff;border-radius:8px;padding:10px}
+.edit-info b{color:#102a5d}
+.edit-status{font-size:13px;color:#3f547f;margin-top:8px;min-height:18px}
+.edit-status.ok{color:var(--ok)}
+.edit-status.warn{color:var(--warn)}
+.edit-note{font-size:12px;color:#5c6f97;line-height:1.45;margin-top:6px}
+.edit-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:#fff;max-height:320px}
+
+@media (max-width:1500px){.tk-layout{grid-template-columns:290px 1fr}}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .side{border-right:none;border-bottom:2px solid #10203d}
+  #bgdFrame{height:calc(100vh - 190px)}
+  .tk-layout{grid-template-columns:1fr}
+  .tk-overview{grid-template-columns:repeat(2,minmax(120px,1fr))}
+  .tk-stat-grid{grid-template-columns:1fr}
+  .edit-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">Hệ thống quản lý</div>
+    <div class="nav">
+      <button class="on" data-menu="bgd">BGD</button>
+      <button data-menu="bld">BLD</button>
+      <button data-menu="tk">Thống kê</button>
+      <button data-menu="edit">Chỉnh sửa điểm</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="up-actions">
+        <button class="btn btn-main" id="btnMain">Tải file A</button>
+        <button class="btn btn-birth" id="btnBirth">Tải file B</button>
+        <button class="btn btn-full" id="btnFull">Tải file đầy đủ</button>
+        <input type="file" id="mainFile" accept=".xlsx,.xls" style="display:none">
+        <input type="file" id="birthFile" accept=".xlsx,.xls" style="display:none">
+        <input type="file" id="fullFile" accept=".xlsx,.xls" style="display:none">
+      </div>
+      <div id="uploadStatus" class="status">Sẵn sàng tải file dùng chung cho toàn bộ web</div>
+    </div>
+
+    <section id="panel-bgd" class="panel on">
+      <div class="frame-wrap">
+        <iframe id="bgdFrame" src="bangdiem.html?embed=1" title="BGD"></iframe>
+      </div>
+    </section>
+
+    <section id="panel-bld" class="panel">
+      <div class="frame-wrap">
+        <iframe id="bldFrame" src="bangdiembld.html?embed=1" title="BLD"></iframe>
+      </div>
+    </section>
+
+    <section id="panel-tk" class="panel">
+      <div class="tk-wrap">
+        <div class="tk-title">Thong ke</div>
+        <div class="tk-head">Thống kê kết quả theo lớp</div>
+        <div class="tk-layout">
+          <aside>
+            <div class="tk-panel">
+              <h4>Nguồn dữ liệu dùng chung</h4>
+              <div class="tk-note">Dùng file đã chọn ở thanh trên. Không cần import lại trong menu Thống kê.</div>
+              <div class="tk-source" id="tkMainFileInfo">File điểm: <b>Chưa chọn</b></div>
+              <div class="tk-source" id="tkBirthFileInfo">File nơi sinh: <b>Chưa chọn</b></div>
+              <div class="tk-actions">
+                <button class="tk-mini" id="tkUseMain">Chọn file điểm</button>
+                <button class="tk-mini" id="tkUseBirth">Chọn file nơi sinh</button>
+              </div>
+            </div>
+
+            <div class="tk-panel tk-filter">
+              <h4>Điều kiện thống kê</h4>
+              <select class="tk-search" id="tkSchoolSelect" style="margin-bottom:8px">
+                <option value="">Tất cả trường</option>
+              </select>
+              <select class="tk-search" id="tkYearSelect" style="margin-bottom:8px">
+                <option value="">Tất cả năm học</option>
+              </select>
+              <select class="tk-search" id="tkSemesterSelect">
+                <option value="">Tất cả học kỳ</option>
+                <option value="1">Học kỳ 1</option>
+                <option value="2">Học kỳ 2</option>
+              </select>
+              <input class="tk-search" id="tkSearch" placeholder="Tìm mã lớp...">
+              <div class="tk-list" id="tkClassList"></div>
+              <div class="tk-meta" id="tkMeta">Chưa có dữ liệu</div>
+            </div>
+          </aside>
+
+          <section class="tk-main">
+            <div class="tk-overview">
+              <div class="tk-kpi"><div class="n" id="kpiTotal">0</div><div class="l">Tổng SV</div></div>
+              <div class="tk-kpi"><div class="n" id="kpiClass">0</div><div class="l">Lớp đã chọn</div></div>
+              <div class="tk-kpi"><div class="n" id="kpiPass">0%</div><div class="l">Tỷ lệ đạt</div></div>
+              <div class="tk-kpi"><div class="n" id="kpiFail">0%</div><div class="l">Tỷ lệ không đạt</div></div>
+            </div>
+
+            <div class="tk-stat-grid">
+              <div class="tk-stat">
+                <h5>Đạt</h5>
+                <div class="tk-line"><span>Xuất sắc</span><span id="tkSX">0 (0%)</span></div>
+                <div class="tk-line"><span>Giỏi</span><span id="tkG">0 (0%)</span></div>
+                <div class="tk-line"><span>Khá</span><span id="tkKha">0 (0%)</span></div>
+                <div class="tk-line"><span>Trung bình</span><span id="tkTB">0 (0%)</span></div>
+              </div>
+              <div class="tk-stat">
+                <h5>Không đạt</h5>
+                <div class="tk-line"><span>Cấm thi</span><span id="tkCT">0 (0%)</span></div>
+                <div class="tk-line"><span>Vắng thi</span><span id="tkVT">0 (0%)</span></div>
+                <div class="tk-line"><span>Đình chỉ</span><span id="tkDC">0 (0%)</span></div>
+                <div class="tk-line"><span>Hỏng</span><span id="tkHong">0 (0%)</span></div>
+              </div>
+            </div>
+
+            <div class="tk-export-row">
+              <button class="tk-export-btn" id="tkExportBtn">Xuất</button>
+            </div>
+
+            <div class="tk-class-cards" id="tkClassCards">
+              <div class="tk-class-card"><h6>Chưa có lớp nào được chọn</h6><div class="r"><span>Tỷ lệ đạt</span><span>0%</span></div></div>
+            </div>
+
+            <div class="tk-table-wrap">
+              <table class="tk-table">
+                <thead>
+                  <tr>
+                    <th>Lớp</th><th>Tổng</th><th>SX</th><th>G</th><th>Khá</th><th>TB</th>
+                    <th>CT</th><th>VT</th><th>DC</th><th>Hỏng</th><th>Tỷ lệ đạt</th>
+                  </tr>
+                </thead>
+                <tbody id="tkClassTableBody">
+                  <tr><td class="l" colspan="11">Chưa có dữ liệu</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-edit" class="panel">
+      <div class="edit-wrap">
+        <div class="edit-title">Cap nhat diem</div>
+        <div class="edit-head">Chỉnh sửa điểm theo mã môn và mã sinh viên</div>
+        <div class="edit-grid">
+          <div class="edit-card">
+            <h4>Tìm sinh viên cần chỉnh</h4>
+            <div class="edit-row">
+              <select class="tk-search" id="editSubjectSelect" style="min-width:170px">
+                <option value="">Chọn mã môn</option>
+              </select>
+              <input class="tk-search" id="editStudentInput" placeholder="Nhập MSSV" style="min-width:170px">
+              <button class="tk-mini" id="editLoadBtn">Tải thông tin</button>
+            </div>
+            <div class="edit-info">
+              <div><b>MSSV:</b> <span id="editInfoMaSV">-</span></div>
+              <div><b>Họ và tên:</b> <span id="editInfoName">-</span></div>
+              <div><b>Ngày sinh:</b> <span id="editInfoBirth">-</span></div>
+              <div><b>Điểm lần 1:</b> <span id="editInfoScore1">-</span></div>
+            </div>
+            <div class="edit-row" style="margin-top:10px">
+              <input class="tk-search" id="editNewScoreInput" placeholder="Nhập điểm chỉnh sửa (lần 2)" style="min-width:220px">
+              <button class="tk-mini" id="editSaveBtn">Lưu chỉnh sửa</button>
+            </div>
+            <div class="edit-status" id="editStatus">Chưa có dữ liệu chỉnh sửa</div>
+          </div>
+
+          <div class="edit-card">
+            <h4>Xuất danh sách đã chỉnh sửa</h4>
+            <div class="edit-row">
+              <select class="tk-search" id="editExportSubjectSelect" style="min-width:170px">
+                <option value="">Chọn mã môn</option>
+              </select>
+              <button class="tk-mini" id="editExportBtn">Xuất Excel</button>
+            </div>
+            <div class="edit-note">File đầy đủ được tải ở thanh trên cùng. Tab này dùng để tìm sinh viên cần chỉnh và lưu điểm lần 2.</div>
+            <div class="edit-table-wrap">
+              <table class="tk-table">
+                <thead>
+                  <tr>
+                    <th>Mã môn</th><th>MSSV</th><th>Họ và</th><th>Tên</th><th>Ngày sinh</th><th>Điểm lần 1</th><th>Điểm lần 2</th>
+                  </tr>
+                </thead>
+                <tbody id="editListBody">
+                  <tr><td class="l" colspan="7">Chưa có bản ghi chỉnh sửa</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const frame=document.getElementById('bgdFrame');
+const bldFrame=document.getElementById('bldFrame');
+const mainFile=document.getElementById('mainFile');
+const birthFile=document.getElementById('birthFile');
+const fullFile=document.getElementById('fullFile');
+const statusEl=document.getElementById('uploadStatus');
+
+const HP_MAP = {'190081':1,'190082':2,'190083':3,'190084':4};
+const SS_KEY_DATA = 'gdqp_byLop';
+const SS_KEY_FILE = 'gdqp_fileName';
+const SS_KEY_BIRTH_FILE = 'gdqp_birth_fileName';
+const SS_KEY_FULL_FILE = 'gdqp_full_fileName';
+const SS_KEY_FULL_ROWS = 'gdqp_full_rows';
+const SS_KEY_EDIT = 'gdqp_edited_scores';
+const SS_KEY_MAIN_ROWS = 'gdqp_main_rows';
+const SS_KEY_ACTIVE_MENU = 'gdqp_active_menu';
+
+let tkByLop = {};
+let tkAllClasses = [];
+let tkSelected = new Set();
+let tkRawRows = [];
+let tkCols = null;
+let tkAllSchools = [];
+let tkAllYears = [];
+let pendingMainFile = null;
+let pendingBirthFile = null;
+let pendingBldMainFile = null;
+let pendingBldBirthFile = null;
+let pendingBldMainRows = null;
+let pendingBldBirthRows = null;
+let sharedMainFileName = '';
+let sharedBirthFileName = '';
+let sharedFullFileName = '';
+let editRecords = [];
+let currentEditTarget = null;
+let editRawRows = [];
+let editCols = null;
+
+const SCHOOL_CODE_MAP = {
+  DVT: 'Trường Đại học Trà Vinh',
+  CDD5704: 'Trường Cao đẳng Vĩnh Long.',
+  CDD5802: 'Trường Cao đẳng Y tế Trà Vinh.',
+  CDD5302: 'Trường Cao đẳng Y tế Tiền Giang.',
+  CDD5701: 'Trường Cao đẳng Nghề Vĩnh Long.',
+  CDD5801: 'Trường Cao đẳng Nghề Trà Vinh.',
+  CDD5301: 'Trường Cao đẳng Tiền Giang.',
+  CDT5301: 'Trường Cao đẳng Nông nghiệp Nam Bộ',
+  KSV: 'Phân hiệu Trường Đại học Kinh tế TP. HCM tại Vĩnh Long.',
+  MTU: 'Trường ĐH XD Miền Tây',
+  CDT5601: 'Trường Cao đẳng Đồng Khởi Bến Tre.',
+  C56: 'Trường Cao đẳng Bến Tre.'
+};
+
+function setStatus(text, cls=''){
+  statusEl.textContent=text;
+  statusEl.className='status'+(cls?(' '+cls):'');
+}
+
+function formatNumber(value){
+  return Number(value || 0).toLocaleString('vi-VN');
+}
+
+function getMainFileStats(){
+  const classCount = Object.keys(tkByLop || {}).length;
+  const studentCount = Object.values(tkByLop || {}).reduce((sum, group) => {
+    const students = Array.isArray(group.students) ? group.students : Object.values(group.students || {});
+    return sum + students.length;
+  }, 0);
+  return { classCount, studentCount };
+}
+
+function refreshUploadStatus(){
+  const mainPart = sharedMainFileName
+    ? (() => {
+        const stats = getMainFileStats();
+        const countText = stats.classCount ? ` · ${formatNumber(stats.classCount)} lớp ${formatNumber(stats.studentCount)} sinh viên` : '';
+        return `📄 Đã tải: ${sharedMainFileName}${countText}`;
+      })()
+    : '📄 Đã tải: Chưa chọn';
+  const birthPart = sharedBirthFileName
+    ? `🌍 Nơi sinh: ${sharedBirthFileName} sẽ được sử dụng chung cho BLD`
+    : '🌍 Nơi sinh: Chưa chọn';
+  const fullPart = sharedFullFileName
+    ? `🧾 File đầy đủ: ${sharedFullFileName} dùng cho chỉnh sửa`
+    : '🧾 File đầy đủ: Chưa chọn';
+  setStatus(`${mainPart} | ${birthPart} | ${fullPart}`, sharedMainFileName ? 'ok' : '');
+}
+
+function updateTKSourceInfo(){
+  document.getElementById('tkMainFileInfo').innerHTML = `File điểm: <b>${sharedMainFileName||'Chưa chọn'}</b>`;
+  document.getElementById('tkBirthFileInfo').innerHTML = `File nơi sinh: <b>${sharedBirthFileName||'Chưa chọn'}</b>`;
+}
+
+function sendToBGD(type, file, excludeWindow){
+  if(!file) return;
+  if(!frame.contentWindow){
+    if(type==='gdqp-load-main') pendingMainFile=file;
+    if(type==='gdqp-load-birth') pendingBirthFile=file;
+    setStatus('BGD chưa sẵn sàng, đã giữ file và sẽ tự gửi lại', 'warn');
+    return;
+  }
+  if(excludeWindow && frame.contentWindow===excludeWindow) return;
+  frame.contentWindow.postMessage({type, file}, '*');
+}
+
+function importMainShared(file, excludeWindow){
+  sendToBGD('gdqp-load-main', file, excludeWindow);
+  sendToBLDMain(file, excludeWindow);
+  readTKFile(file, false);
+}
+
+function sendToBLDMain(file, excludeWindow){
+  if(!file) return;
+  if(!bldFrame || !bldFrame.contentWindow){
+    pendingBldMainFile = file;
+    return;
+  }
+  if(excludeWindow && bldFrame.contentWindow===excludeWindow) return;
+  bldFrame.contentWindow.postMessage({type:'gdqp-load-main', file}, '*');
+}
+
+function sendRowsToBLDMain(rows, excludeWindow){
+  if(!Array.isArray(rows) || !rows.length) return;
+  if(!bldFrame || !bldFrame.contentWindow){
+    pendingBldMainRows = rows;
+    return;
+  }
+  if(excludeWindow && bldFrame.contentWindow===excludeWindow) return;
+  bldFrame.contentWindow.postMessage({type:'gdqp-load-main-rows', rows}, '*');
+}
+
+function sendToBLDBirth(file, excludeWindow){
+  if(!file) return;
+  if(!bldFrame || !bldFrame.contentWindow){
+    pendingBldBirthFile = file;
+    return;
+  }
+  if(excludeWindow && bldFrame.contentWindow===excludeWindow) return;
+  bldFrame.contentWindow.postMessage({type:'gdqp-load-birth', file}, '*');
+}
+
+function sendRowsToBLDBirth(rows, excludeWindow){
+  if(!Array.isArray(rows) || !rows.length) return;
+  if(!bldFrame || !bldFrame.contentWindow){
+    pendingBldBirthRows = rows;
+    return;
+  }
+  if(excludeWindow && bldFrame.contentWindow===excludeWindow) return;
+  bldFrame.contentWindow.postMessage({type:'gdqp-load-birth-rows', rows}, '*');
+}
+
+function hydrateTKFromSession(){
+  const raw = sessionStorage.getItem(SS_KEY_DATA);
+  const rawRows = sessionStorage.getItem(SS_KEY_MAIN_ROWS);
+  sharedMainFileName = sessionStorage.getItem(SS_KEY_FILE)||sharedMainFileName;
+  sharedBirthFileName = sessionStorage.getItem(SS_KEY_BIRTH_FILE)||sharedBirthFileName;
+  updateTKSourceInfo();
+  refreshUploadStatus();
+
+  if(rawRows){
+    try{
+      const rows = JSON.parse(rawRows);
+      if(Array.isArray(rows) && rows.length){
+        buildTKData(rows);
+        return;
+      }
+    }catch(e){}
+  }
+
+  if(!raw) return;
+
+  try{
+    const data = JSON.parse(raw);
+    tkByLop = {};
+    Object.entries(data).forEach(([lop, grp])=>{
+      const students = Array.isArray(grp.students) ? grp.students : Object.values(grp.students||{});
+      tkByLop[lop] = {students};
+    });
+    tkAllClasses = Object.keys(tkByLop).sort();
+    tkSelected = new Set();
+    renderTKClassList();
+    updateTKSummary();
+    refreshUploadStatus();
+  }catch(e){}
+}
+
+window.addEventListener('message', (event)=>{
+  const data = event.data || {};
+  if(!data || typeof data !== 'object') return;
+
+  if(data.type==='gdqp-share-main' && data.file){
+    sharedMainFileName = data.fileName || data.file.name || sharedMainFileName;
+    sessionStorage.setItem(SS_KEY_FILE, sharedMainFileName);
+    importMainShared(data.file, event.source);
+    updateTKSourceInfo();
+    refreshUploadStatus();
+    return;
+  }
+
+  if(data.type==='gdqp-share-birth' && data.file){
+    sharedBirthFileName = data.fileName || data.file.name || sharedBirthFileName;
+    sessionStorage.setItem(SS_KEY_BIRTH_FILE, sharedBirthFileName);
+    sendToBGD('gdqp-load-birth', data.file, event.source);
+    sendToBLDBirth(data.file, event.source);
+    readBirthRowsAndShare(data.file, event.source);
+    updateTKSourceInfo();
+    refreshUploadStatus();
+  }
+});
+
+frame.addEventListener('load',()=>{
+  frame.contentWindow.postMessage({type:'gdqp-toggle-external-upload', enabled:true}, '*');
+  if(pendingMainFile){ frame.contentWindow.postMessage({type:'gdqp-load-main', file:pendingMainFile}, '*'); pendingMainFile=null; }
+  if(pendingBirthFile){ frame.contentWindow.postMessage({type:'gdqp-load-birth', file:pendingBirthFile}, '*'); pendingBirthFile=null; }
+  setTimeout(hydrateTKFromSession, 80);
+});
+
+if(bldFrame){
+  bldFrame.addEventListener('load',()=>{
+    if(pendingBldMainFile){
+      bldFrame.contentWindow.postMessage({type:'gdqp-load-main', file:pendingBldMainFile}, '*');
+      pendingBldMainFile = null;
+    }
+    if(pendingBldBirthFile){
+      bldFrame.contentWindow.postMessage({type:'gdqp-load-birth', file:pendingBldBirthFile}, '*');
+      pendingBldBirthFile = null;
+    }
+    if(pendingBldMainRows){
+      bldFrame.contentWindow.postMessage({type:'gdqp-load-main-rows', rows:pendingBldMainRows}, '*');
+      pendingBldMainRows = null;
+    }
+    if(pendingBldBirthRows){
+      bldFrame.contentWindow.postMessage({type:'gdqp-load-birth-rows', rows:pendingBldBirthRows}, '*');
+      pendingBldBirthRows = null;
+    }
+
+    // Rehydrate BLD after page reload so users don't need to upload again.
+    try {
+      const rawRows = sessionStorage.getItem(SS_KEY_MAIN_ROWS);
+      if (rawRows) {
+        const rows = JSON.parse(rawRows);
+        if (Array.isArray(rows) && rows.length) {
+          bldFrame.contentWindow.postMessage({type:'gdqp-load-main-rows', rows}, '*');
+        }
+      }
+    } catch (e) {}
+  });
+}
+
+const navButtons=[...document.querySelectorAll('.nav button')];
+const panels={
+  bgd:document.getElementById('panel-bgd'),
+  bld:document.getElementById('panel-bld'),
+  tk:document.getElementById('panel-tk'),
+  edit:document.getElementById('panel-edit')
+};
+function activateMenu(menu){
+  const target = panels[menu] ? menu : 'bgd';
+  navButtons.forEach(b=>b.classList.remove('on'));
+  const activeBtn = navButtons.find(b=>b.dataset.menu===target);
+  if(activeBtn) activeBtn.classList.add('on');
+  Object.values(panels).forEach(p=>p.classList.remove('on'));
+  panels[target].classList.add('on');
+  sessionStorage.setItem(SS_KEY_ACTIVE_MENU, target);
+  if(target==='bgd') refreshUploadStatus();
+  if(target==='bld') setStatus('BLD đã tích hợp và dùng chung dữ liệu upload từ toàn web', 'ok');
+  if(target==='tk'){ hydrateTKFromSession(); setStatus('Thống kê dùng trực tiếp file đã chọn ở thanh trên', 'ok'); }
+  if(target==='edit') setStatus('Chỉnh sửa điểm dùng dữ liệu file điểm đã tải', 'ok');
+}
+
+navButtons.forEach(btn=>{
+  btn.addEventListener('click',()=>activateMenu(btn.dataset.menu));
+});
+
+activateMenu(sessionStorage.getItem(SS_KEY_ACTIVE_MENU) || 'bgd');
+
+const tkClassList = document.getElementById('tkClassList');
+const tkClassTableBody = document.getElementById('tkClassTableBody');
+const tkClassCards = document.getElementById('tkClassCards');
+const tkSearch = document.getElementById('tkSearch');
+const tkSchoolSelect = document.getElementById('tkSchoolSelect');
+const tkYearSelect = document.getElementById('tkYearSelect');
+const tkSemesterSelect = document.getElementById('tkSemesterSelect');
+const editSubjectSelect = document.getElementById('editSubjectSelect');
+const editStudentInput = document.getElementById('editStudentInput');
+const editLoadBtn = document.getElementById('editLoadBtn');
+const editNewScoreInput = document.getElementById('editNewScoreInput');
+const editSaveBtn = document.getElementById('editSaveBtn');
+const editStatus = document.getElementById('editStatus');
+const editListBody = document.getElementById('editListBody');
+const editExportSubjectSelect = document.getElementById('editExportSubjectSelect');
+const editExportBtn = document.getElementById('editExportBtn');
+
+document.getElementById('tkExportBtn').addEventListener('click', exportTK);
+tkSearch.addEventListener('input', renderTKClassList);
+tkSchoolSelect.addEventListener('change', applyTKFilters);
+tkYearSelect.addEventListener('change', applyTKFilters);
+tkSemesterSelect.addEventListener('change', applyTKFilters);
+editLoadBtn.addEventListener('click', loadEditStudent);
+editSaveBtn.addEventListener('click', saveEditedScore);
+editExportBtn.addEventListener('click', exportEditedScores);
+
+document.getElementById('btnMain').addEventListener('click',()=>mainFile.click());
+document.getElementById('btnBirth').addEventListener('click',()=>birthFile.click());
+document.getElementById('btnFull').addEventListener('click',()=>fullFile.click());
+document.getElementById('tkUseMain').addEventListener('click',()=>mainFile.click());
+document.getElementById('tkUseBirth').addEventListener('click',()=>birthFile.click());
+
+mainFile.addEventListener('change',e=>{
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  sharedMainFileName = file.name;
+  sessionStorage.setItem(SS_KEY_FILE, sharedMainFileName);
+  importMainShared(file);
+  updateTKSourceInfo();
+  refreshUploadStatus();
+  mainFile.value='';
+});
+
+birthFile.addEventListener('change',e=>{
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  sharedBirthFileName = file.name;
+  sessionStorage.setItem(SS_KEY_BIRTH_FILE, sharedBirthFileName);
+  sendToBGD('gdqp-load-birth', file);
+  sendToBLDBirth(file);
+  readBirthRowsAndShare(file);
+  updateTKSourceInfo();
+  refreshUploadStatus();
+  birthFile.value='';
+});
+
+fullFile.addEventListener('change',e=>{
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  readFullRows(file);
+  fullFile.value='';
+});
+
+function detectCols(sample){
+  const keys=Object.keys(sample||{});
+  const nk = s => String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d').replace(/\s+/g,'');
+  const find=(...ns)=>keys.find(k=>ns.some(n=>nk(k)===nk(n)))||null;
+  return {
+    maSV: find('MaSV','MSSV','masv'),
+    hoLot: find('HoLotSV','HoLot','holot'),
+    ten: find('TenSV','Ten'),
+    ngaySinh: find('NgaySinhC','NgaySinh','NgaySinhSV','NgaySinhCuaSV'),
+    maLop: find('MaLop','malop'),
+    maMH: find('MaMH','mamh'),
+    score: keys.find(k=>{const v=nk(k); return v==='t1'||v.includes('dtkl1')||v.includes('diemthi1')||v.includes('diemtongketlan1');})||null,
+    t1: find('T1','T1_DTK L1','T1_DTKL1','DTK L1','DTKL1'),
+    namHoc: find('Namhoc','NamHoc','Nam_hoc','Nam hoc'),
+    hocKy: find('hocky','HocKy','Hoc_ky','Hoc ky'),
+    nhhk: find('NHHK','NHHK'),
+    nhomTo: find('NhomTo','Nhomto','Nhom To'),
+    gcNhapDiem: find('GcNhapDiem','GcNhap diem','GhiChuNhapDiem','GhiChu'),
+    school: find('Truong','SchoolName','TenDT','TenTruong','DonViDaoTao','CoSoDaoTao'),
+    year: find('NamHoc','Namhoc','NienKhoa','Nienkhoa'),
+    semester: find('HocKy','Hocky','HocKi','Hocki','HK')
+  };
+}
+
+function extractSchoolCodeFromClass(classCode){
+  const text = String(classCode || '').trim().toUpperCase();
+  if(!text) return '';
+  const match = text.match(/(CDD\d{4}|CDT\d{4}|DVT|KSV|MTU|C56)\b/);
+  if(match && match[1]) return match[1];
+  const parts = text.split('_').filter(Boolean);
+  return (parts.length ? parts[parts.length - 1] : text).trim();
+}
+
+function getSchoolFromRow(row){
+  if(!row || !tkCols) return '';
+  const maLop = tkCols.maLop && row[tkCols.maLop] != null ? String(row[tkCols.maLop]).trim() : '';
+  const code = extractSchoolCodeFromClass(maLop);
+  if(code) return SCHOOL_CODE_MAP[code] || code;
+  const byCol = tkCols.school && row[tkCols.school] != null ? String(row[tkCols.school]).trim() : '';
+  return byCol;
+}
+
+function normalizeSchoolText(value){
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase()
+    .replace(/đ/g,'d')
+    .replace(/[.]/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function normalizeSemesterValue(value){
+  const v = String(value || '').trim().toUpperCase();
+  if(!v) return '';
+  if(v === '1' || v === 'HK1' || v === 'HOCKY1' || v.includes('KỲ 1') || v.includes('KI 1') || v.includes('KY 1')) return '1';
+  if(v === '2' || v === 'HK2' || v === 'HOCKY2' || v.includes('KỲ 2') || v.includes('KI 2') || v.includes('KY 2')) return '2';
+  return '';
+}
+
+function collectTKFilterOptions(){
+  const schools = new Set();
+  const years = new Set();
+  tkRawRows.forEach((r)=>{
+    const school = getSchoolFromRow(r);
+    if(school) schools.add(school);
+    if(tkCols && tkCols.year && r[tkCols.year] != null){
+      const year = String(r[tkCols.year]).trim();
+      if(year) years.add(year);
+    }
+  });
+  tkAllSchools = [...schools].sort((a,b)=>a.localeCompare(b,'vi'));
+  tkAllYears = [...years].sort((a,b)=>a.localeCompare(b,'vi'));
+}
+
+function renderSchoolOptions(){
+  const oldValue = tkSchoolSelect.value;
+  const schools = tkAllSchools;
+  tkSchoolSelect.innerHTML = '<option value="">Tất cả trường</option>' + schools.map(s=>`<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
+  if(schools.includes(oldValue)) tkSchoolSelect.value = oldValue;
+}
+
+function renderYearOptions(){
+  const oldValue = tkYearSelect.value;
+  tkYearSelect.innerHTML = '<option value="">Tất cả năm học</option>' + tkAllYears.map(y=>`<option value="${y.replace(/"/g,'&quot;')}">${y}</option>`).join('');
+  if(tkAllYears.includes(oldValue)) tkYearSelect.value = oldValue;
+}
+
+function readTKFile(file, showStatus=true){
+  if(showStatus) setStatus('Đang đọc file thống kê: '+file.name, 'warn');
+  const fr = new FileReader();
+  fr.onload = e=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:null});
+      if(!rows.length){ if(showStatus) setStatus('File thống kê trống', 'warn'); return; }
+      try{ sessionStorage.setItem(SS_KEY_MAIN_ROWS, JSON.stringify(rows)); }catch(ex){}
+      buildTKData(rows);
+      sendRowsToBLDMain(rows);
+      if(showStatus) setStatus('Đã import thống kê: '+file.name, 'ok');
+    }catch(err){ if(showStatus) setStatus('Lỗi file thống kê: '+err.message, 'warn'); }
+  };
+  fr.readAsBinaryString(file);
+}
+
+function readBirthRowsAndShare(file, excludeWindow){
+  if(!file) return;
+  const fr = new FileReader();
+  fr.onload = e=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:null});
+      sendRowsToBLDBirth(rows, excludeWindow);
+    }catch(err){}
+  };
+  fr.readAsBinaryString(file);
+}
+
+function readFullRows(file){
+  if(!file) return;
+  const fr = new FileReader();
+  fr.onload = e=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:null});
+      if(!rows.length){ setStatus('File đầy đủ trống', 'warn'); return; }
+      editRawRows = rows;
+      editCols = detectCols(rows[0]);
+      tkRawRows = rows;
+      tkCols = detectCols(rows[0]);
+      collectTKFilterOptions();
+      renderSchoolOptions();
+      renderYearOptions();
+      applyTKFilters();
+      updateTKMetaText();
+      updateTKSummary();
+      sharedFullFileName = file.name;
+      sessionStorage.setItem(SS_KEY_FULL_FILE, sharedFullFileName);
+      try{ sessionStorage.setItem(SS_KEY_FULL_ROWS, JSON.stringify(rows)); }catch(ex){}
+      updateEditSubjectOptions();
+      renderEditList();
+      refreshUploadStatus();
+      setStatus('Đã tải file đầy đủ: '+file.name, 'ok');
+    }catch(err){ setStatus('Lỗi file đầy đủ: '+err.message, 'warn'); }
+  };
+  fr.readAsBinaryString(file);
+}
+
+function buildTKData(rows){
+  tkRawRows = rows;
+  tkCols = detectCols(rows[0]);
+  collectTKFilterOptions();
+  renderSchoolOptions();
+  renderYearOptions();
+  updateEditSubjectOptions();
+  applyTKFilters();
+  hydrateEditRecords();
+}
+
+function hydrateFullSourceFromSession(){
+  sharedFullFileName = sessionStorage.getItem(SS_KEY_FULL_FILE) || sharedFullFileName;
+  const rawFullRows = sessionStorage.getItem(SS_KEY_FULL_ROWS);
+  if(rawFullRows){
+    try{
+      const rows = JSON.parse(rawFullRows);
+      if(Array.isArray(rows) && rows.length){
+        editRawRows = rows;
+        editCols = detectCols(rows[0]);
+        tkRawRows = rows;
+        tkCols = detectCols(rows[0]);
+        collectTKFilterOptions();
+        renderSchoolOptions();
+        renderYearOptions();
+        applyTKFilters();
+        updateTKMetaText();
+        updateTKSummary();
+      }
+    }catch(e){}
+  }
+  refreshUploadStatus();
+}
+
+function setEditStatus(text, cls=''){
+  if(!editStatus) return;
+  editStatus.textContent = text;
+  editStatus.className = 'edit-status' + (cls ? (' ' + cls) : '');
+}
+
+function saveEditRecords(){
+  const payload = JSON.stringify(editRecords);
+  try{ sessionStorage.setItem(SS_KEY_EDIT, payload); }catch(e){}
+  try{ localStorage.setItem(SS_KEY_EDIT, payload); }catch(e){}
+}
+
+function hydrateEditRecords(){
+  try{
+    const raw = sessionStorage.getItem(SS_KEY_EDIT) || localStorage.getItem(SS_KEY_EDIT);
+    editRecords = raw ? JSON.parse(raw) : [];
+    if(raw){
+      try{ sessionStorage.setItem(SS_KEY_EDIT, raw); }catch(e){}
+    }
+  }catch(e){
+    editRecords = [];
+  }
+  updateEditSubjectOptions();
+  renderEditList();
+}
+
+function getEditSourceRows(){
+  return editRawRows;
+}
+
+function getEditSourceCols(){
+  return editCols;
+}
+
+function buildNHHKFromRow(row, cols){
+  if(!row || !cols) return '';
+  const direct = cols.nhhk && row[cols.nhhk] != null ? String(row[cols.nhhk]).trim() : '';
+  if(direct) return direct;
+  const namHoc = cols.namHoc && row[cols.namHoc] != null ? String(row[cols.namHoc]).trim() : '';
+  const hocKy = cols.hocKy && row[cols.hocKy] != null ? String(row[cols.hocKy]).trim() : '';
+  if(!namHoc && !hocKy) return '';
+  return `${namHoc}${hocKy}`;
+}
+
+function formatNgaySinhValue(value){
+  if(value === null || value === undefined || value === '') return '';
+  const text = String(value).trim();
+  if(!text) return '';
+  if(/^\d+(?:\.\d+)?$/.test(text)){
+    const serial = Number(text);
+    if(Number.isFinite(serial) && typeof XLSX !== 'undefined' && XLSX.SSF && XLSX.SSF.parse_date_code){
+      const parsed = XLSX.SSF.parse_date_code(serial);
+      if(parsed && parsed.y && parsed.m && parsed.d){
+        return `${parsed.d}/${parsed.m}/${parsed.y}`;
+      }
+    }
+  }
+  return text;
+}
+
+function cleanExportValue(value, isDate=false){
+  if(value === null || value === undefined) return '';
+  if(isDate) return formatNgaySinhValue(value);
+  const text = String(value).trim();
+  return text;
+}
+
+function getEditRecordKey(subjectCode, maSV){
+  return `${String(subjectCode || '').trim()}|${String(maSV || '').trim()}`;
+}
+
+function buildEditRecordMap(){
+  const map = new Map();
+  editRecords.forEach((record)=>{
+    const key = getEditRecordKey(record.subjectCode, record.maSV);
+    if(key !== '|') map.set(key, record);
+  });
+  return map;
+}
+
+function updateEditSubjectOptions(){
+  const currentEdit = editSubjectSelect.value;
+  const currentExport = editExportSubjectSelect.value;
+  const sourceRows = getEditSourceRows();
+  const sourceCols = getEditSourceCols();
+  const subjectsFromRaw = sourceCols && sourceCols.maMH
+    ? sourceRows.map((r)=>String(r[sourceCols.maMH] || '').trim()).filter(Boolean)
+    : [];
+  const subjectsFromEdited = editRecords.map((r)=>String(r.subjectCode || '').trim()).filter(Boolean);
+  const subjects = [...new Set([...subjectsFromRaw, ...subjectsFromEdited])].sort((a,b)=>a.localeCompare(b,'vi'));
+
+  const options = '<option value="">Chọn mã môn</option>' + subjects.map((code)=>`<option value="${code}">${code}</option>`).join('');
+  editSubjectSelect.innerHTML = options;
+  editExportSubjectSelect.innerHTML = options;
+
+  if(subjects.includes(currentEdit)) editSubjectSelect.value = currentEdit;
+  if(subjects.includes(currentExport)) editExportSubjectSelect.value = currentExport;
+}
+
+function formatName(row){
+  const cols = getEditSourceCols();
+  const ho = cols && cols.hoLot && row[cols.hoLot] != null ? String(row[cols.hoLot]).trim() : '';
+  const ten = cols && cols.ten && row[cols.ten] != null ? String(row[cols.ten]).trim() : '';
+  return `${ho} ${ten}`.replace(/\s+/g,' ').trim();
+}
+
+function getNameParts(row){
+  const cols = getEditSourceCols();
+  const ho = cols && cols.hoLot && row[cols.hoLot] != null ? String(row[cols.hoLot]).trim() : '';
+  const ten = cols && cols.ten && row[cols.ten] != null ? String(row[cols.ten]).trim() : '';
+  return { ho, ten };
+}
+
+function loadEditStudent(){
+  const sourceRows = getEditSourceRows();
+  const sourceCols = getEditSourceCols();
+  if(!sourceCols || !sourceRows.length){
+    setEditStatus('Vui lòng tải file đầy đủ trước khi tìm sinh viên cần chỉnh', 'warn');
+    return;
+  }
+  const subject = String(editSubjectSelect.value || '').trim();
+  const maSV = String(editStudentInput.value || '').trim();
+  if(!subject){
+    setEditStatus('Vui lòng chọn mã môn', 'warn');
+    return;
+  }
+  if(!maSV){
+    setEditStatus('Vui lòng nhập MSSV', 'warn');
+    return;
+  }
+
+  const row = sourceRows.find((r)=>{
+    const rowSubject = sourceCols.maMH && r[sourceCols.maMH] != null ? String(r[sourceCols.maMH]).trim() : '';
+    const rowSV = sourceCols.maSV && r[sourceCols.maSV] != null ? String(r[sourceCols.maSV]).trim() : '';
+    return rowSubject === subject && rowSV === maSV;
+  });
+
+  if(!row){
+    currentEditTarget = null;
+    document.getElementById('editInfoMaSV').textContent = '-';
+    document.getElementById('editInfoName').textContent = '-';
+    document.getElementById('editInfoBirth').textContent = '-';
+    document.getElementById('editInfoScore1').textContent = '-';
+    setEditStatus('Không tìm thấy sinh viên theo mã môn và MSSV đã nhập', 'warn');
+    return;
+  }
+
+  const name = formatName(row) || '-';
+  const nameParts = getNameParts(row);
+  const birth = sourceCols.ngaySinh && row[sourceCols.ngaySinh] != null ? formatNgaySinhValue(row[sourceCols.ngaySinh]) : '-';
+  const diemLan1 = sourceCols.score && row[sourceCols.score] != null ? String(row[sourceCols.score]).trim() : '';
+
+  currentEditTarget = { subject, maSV, name, hoVa: nameParts.ho, ten: nameParts.ten, birth, diemLan1: diemLan1 || '-' };
+  document.getElementById('editInfoMaSV').textContent = maSV;
+  document.getElementById('editInfoName').textContent = name;
+  document.getElementById('editInfoBirth').textContent = birth;
+  document.getElementById('editInfoScore1').textContent = diemLan1 || '-';
+
+  const existing = editRecords.find((x)=>x.subjectCode===subject && x.maSV===maSV);
+  editNewScoreInput.value = existing ? existing.diemLan2 : '';
+  setEditStatus('Đã tải thông tin sinh viên', 'ok');
+}
+
+function saveEditedScore(){
+  if(!currentEditTarget){
+    setEditStatus('Vui lòng tải thông tin sinh viên trước khi lưu', 'warn');
+    return;
+  }
+  const diemLan2 = String(editNewScoreInput.value || '').trim();
+  if(!diemLan2){
+    setEditStatus('Vui lòng nhập điểm chỉnh sửa (lần 2)', 'warn');
+    return;
+  }
+
+  const record = {
+    subjectCode: currentEditTarget.subject,
+    maSV: currentEditTarget.maSV,
+    hoTen: currentEditTarget.name,
+    hoVa: currentEditTarget.hoVa || '',
+    ten: currentEditTarget.ten || '',
+    ngaySinh: currentEditTarget.birth,
+    diemLan1: currentEditTarget.diemLan1,
+    diemLan2,
+    updatedAt: new Date().toISOString()
+  };
+
+  const idx = editRecords.findIndex((x)=>x.subjectCode===record.subjectCode && x.maSV===record.maSV);
+  if(idx >= 0) editRecords[idx] = record;
+  else editRecords.push(record);
+
+  saveEditRecords();
+  updateEditSubjectOptions();
+  renderEditList();
+  setEditStatus('Đã lưu chỉnh sửa vào danh sách riêng', 'ok');
+}
+
+function collectRowHeaders(rows){
+  const headers = [];
+  const seen = new Set();
+  rows.forEach((row)=>{
+    Object.keys(row || {}).forEach((key)=>{
+      if(seen.has(key)) return;
+      seen.add(key);
+      headers.push(key);
+    });
+  });
+  return headers;
+}
+
+function exportFullEditedFile(){
+  if(!tkRawRows.length){
+    setEditStatus('Chưa có dữ liệu file điểm để tải file đầy đủ', 'warn');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  const headers = collectRowHeaders(tkRawRows);
+  const editMap = buildEditRecordMap();
+  const fullRows = tkRawRows.map((row)=>{
+    const clone = {};
+    headers.forEach((key)=>{
+      clone[key] = row && row[key] != null ? row[key] : '';
+    });
+    const subject = tkCols && tkCols.maMH && row[tkCols.maMH] != null ? String(row[tkCols.maMH]).trim() : '';
+    const maSV = tkCols && tkCols.maSV && row[tkCols.maSV] != null ? String(row[tkCols.maSV]).trim() : '';
+    const edit = editMap.get(getEditRecordKey(subject, maSV));
+    clone.DiemLan2_ChinhSua = edit ? edit.diemLan2 : '';
+    clone.NgayCapNhat_ChinhSua = edit ? edit.updatedAt : '';
+    return clone;
+  });
+
+  const fullSheet = XLSX.utils.json_to_sheet(fullRows, {
+    header: [...headers, 'DiemLan2_ChinhSua', 'NgayCapNhat_ChinhSua']
+  });
+  XLSX.utils.book_append_sheet(wb, fullSheet, 'DuLieuDayDu');
+
+  const editRows = editRecords.map((record)=>({
+    MaMH: record.subjectCode || '',
+    MaSV: record.maSV || '',
+    HoVa: record.hoVa || '',
+    Ten: record.ten || '',
+    NgaySinh: record.ngaySinh || '',
+    DiemLan1: record.diemLan1 || '',
+    DiemLan2: record.diemLan2 || '',
+    UpdatedAt: record.updatedAt || ''
+  }));
+  if(editRows.length){
+    const editSheet = XLSX.utils.json_to_sheet(editRows, {
+      header: ['MaMH', 'MaSV', 'HoVa', 'Ten', 'NgaySinh', 'DiemLan1', 'DiemLan2', 'UpdatedAt']
+    });
+    XLSX.utils.book_append_sheet(wb, editSheet, 'DanhSachChinhSua');
+  }
+
+  const d = new Date();
+  const fileName = `DuLieuDayDu_ChinhSua_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`;
+  XLSX.writeFile(wb, fileName, {bookSST:false, type:'binary'});
+  setEditStatus(`Đã tải file đầy đủ${editRows.length ? ` với ${editRows.length} bản ghi chỉnh sửa` : ''}`, 'ok');
+}
+
+function renderEditList(){
+  if(!editRecords.length){
+    editListBody.innerHTML = '<tr><td class="l" colspan="7">Chưa có bản ghi chỉnh sửa</td></tr>';
+    return;
+  }
+  const sorted = [...editRecords].sort((a,b)=>{
+    if(a.subjectCode !== b.subjectCode) return String(a.subjectCode).localeCompare(String(b.subjectCode),'vi');
+    return String(a.maSV).localeCompare(String(b.maSV),'vi');
+  });
+  editListBody.innerHTML = sorted.map((r)=>`<tr><td>${r.subjectCode}</td><td>${r.maSV}</td><td class="l">${r.hoVa || ''}</td><td class="l">${r.ten || ''}</td><td>${r.ngaySinh || ''}</td><td>${r.diemLan1 || ''}</td><td>${r.diemLan2 || ''}</td></tr>`).join('');
+}
+
+function exportEditedScores(){
+  if(!editRecords.length){
+    setEditStatus('Chưa có dữ liệu chỉnh sửa để xuất', 'warn');
+    return;
+  }
+  const sourceRows = getEditSourceRows();
+  const sourceCols = getEditSourceCols();
+  if(!sourceCols || !sourceRows.length){
+    setEditStatus('Vui lòng tải file đầy đủ trước khi xuất danh sách đã chỉnh sửa', 'warn');
+    return;
+  }
+  const subject = String(editExportSubjectSelect.value || '').trim();
+  if(!subject){
+    setEditStatus('Vui lòng chọn mã môn cần xuất', 'warn');
+    return;
+  }
+  const rows = editRecords.filter((r)=>{
+    if(String(r.subjectCode || '').trim() !== subject) return false;
+    return true;
+  });
+
+  if(!rows.length){
+    setEditStatus('Không có bản ghi phù hợp để xuất', 'warn');
+    return;
+  }
+
+  const sourceMap = new Map();
+  sourceRows.forEach((r)=>{
+    const maMH = sourceCols.maMH && r[sourceCols.maMH] != null ? String(r[sourceCols.maMH]).trim() : '';
+    const maSV = sourceCols.maSV && r[sourceCols.maSV] != null ? String(r[sourceCols.maSV]).trim() : '';
+    if(!maMH || !maSV) return;
+    sourceMap.set(`${maMH}|${maSV}`, r);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const aoa = [
+    ['Stt','MaSV','MaMH','NHHK','T1','Diemsua','HoLotSV','TenSV','NgaySinhC','MaLop','NhomTo','GcNhapDiem']
+  ];
+  rows.forEach((r, idx)=>{
+    const src = sourceMap.get(`${String(r.subjectCode||'').trim()}|${String(r.maSV||'').trim()}`) || {};
+    const nhhk = buildNHHKFromRow(src, sourceCols);
+    const t1Val = sourceCols.t1 && src[sourceCols.t1] != null
+      ? cleanExportValue(src[sourceCols.t1])
+      : (sourceCols.score && src[sourceCols.score] != null ? cleanExportValue(src[sourceCols.score]) : cleanExportValue(r.diemLan1));
+    const hoLot = sourceCols.hoLot && src[sourceCols.hoLot] != null ? cleanExportValue(src[sourceCols.hoLot]) : cleanExportValue(r.hoVa);
+    const ten = sourceCols.ten && src[sourceCols.ten] != null ? cleanExportValue(src[sourceCols.ten]) : cleanExportValue(r.ten);
+    const ngaySinh = sourceCols.ngaySinh && src[sourceCols.ngaySinh] != null ? formatNgaySinhValue(src[sourceCols.ngaySinh]) : cleanExportValue(r.ngaySinh, true);
+    const maLop = sourceCols.maLop && src[sourceCols.maLop] != null ? cleanExportValue(src[sourceCols.maLop]) : '';
+    const nhomTo = sourceCols.nhomTo && src[sourceCols.nhomTo] != null ? cleanExportValue(src[sourceCols.nhomTo]) : '';
+    const gcNhapDiem = sourceCols.gcNhapDiem && src[sourceCols.gcNhapDiem] != null ? cleanExportValue(src[sourceCols.gcNhapDiem]) : '';
+    aoa.push([
+      idx + 1,
+      cleanExportValue(r.maSV),
+      cleanExportValue(r.subjectCode),
+      nhhk,
+      t1Val,
+      cleanExportValue(r.diemLan2),
+      hoLot,
+      ten,
+      ngaySinh,
+      maLop,
+      nhomTo,
+      gcNhapDiem
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:6},{wch:14},{wch:12},{wch:10},{wch:8},{wch:10},{wch:20},{wch:14},{wch:14},{wch:14},{wch:10},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, 'ChinhSuaDiem');
+
+  const d = new Date();
+  const fileName = `DanhSach_ChinhSuaDiem_${subject}_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`;
+  XLSX.writeFile(wb, fileName, {bookSST:false, type:'binary'});
+  editRecords = editRecords.filter((r)=>String(r.subjectCode || '').trim() !== subject);
+  saveEditRecords();
+  updateEditSubjectOptions();
+  renderEditList();
+  setEditStatus(`Đã xuất ${rows.length} bản ghi chỉnh sửa. Đã giữ lại các bản ghi chưa xuất.`, 'ok');
+}
+
+function applyTKFilters(){
+  if(!tkCols){
+    tkByLop = {};
+    tkAllClasses = [];
+    tkSelected = new Set();
+    renderTKClassList();
+    updateTKSummary();
+    return;
+  }
+
+  const selectedSchool = String(tkSchoolSelect.value || '').trim();
+  const selectedYear = String(tkYearSelect.value || '').trim();
+  const selectedSemester = String(tkSemesterSelect.value || '').trim();
+
+  const filteredRows = tkRawRows.filter((r)=>{
+    const school = getSchoolFromRow(r);
+    if(selectedSchool && normalizeSchoolText(school) !== normalizeSchoolText(selectedSchool)) return false;
+
+    if(selectedYear){
+      if(!tkCols.year) return false;
+      const y = r[tkCols.year] != null ? String(r[tkCols.year]).trim() : '';
+      if(y !== selectedYear) return false;
+    }
+
+    if(selectedSemester){
+      if(!tkCols.semester) return false;
+      const hk = normalizeSemesterValue(r[tkCols.semester]);
+      if(hk !== selectedSemester) return false;
+    }
+
+    return true;
+  });
+
+  const col = tkCols;
+  tkByLop = {};
+  filteredRows.forEach(r=>{
+    const maMH = r[col.maMH]!=null?String(r[col.maMH]).trim():'';
+    const hp = HP_MAP[maMH];
+    if(!hp) return;
+    const maSV = r[col.maSV]!=null?String(r[col.maSV]).trim():'';
+    if(!maSV) return;
+    const maLop = r[col.maLop]!=null?String(r[col.maLop]).trim():'Không rõ';
+    if(!tkByLop[maLop]) tkByLop[maLop] = {students:{}};
+    if(!tkByLop[maLop].students[maSV]){
+      tkByLop[maLop].students[maSV] = {maSV,hoLot:r[col.hoLot]||'',ten:r[col.ten]||'',hp1:null,hp2:null,hp3:null,hp4:null,hp1r:'',hp2r:'',hp3r:'',hp4r:''};
+    }
+    const sv = tkByLop[maLop].students[maSV];
+    const raw = (r[col.score]!==null&&r[col.score]!==undefined)?String(r[col.score]).trim():'';
+    const n = raw!==''?parseFloat(raw):NaN;
+    const oldRaw = sv['hp'+hp+'r']||'';
+    if(raw!=='' || oldRaw===''){
+      sv['hp'+hp] = (!isNaN(n)&&raw!=='')?n:null;
+      sv['hp'+hp+'r'] = raw;
+    }
+  });
+  Object.values(tkByLop).forEach(g=>{ g.students = Object.values(g.students); });
+  tkAllClasses = Object.keys(tkByLop).sort();
+  tkSelected = new Set([...tkSelected].filter((k)=>tkAllClasses.includes(k)));
+  renderTKClassList();
+  updateTKSummary();
+}
+
+function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d').replace(/\s+/g,''); }
+function getFilteredClasses(){ const q = norm(tkSearch.value||''); return q?tkAllClasses.filter(k=>norm(k).includes(q)):tkAllClasses; }
+
+function updateTKMetaText(){
+  const selectedSchool = tkSchoolSelect.value || 'Tất cả trường';
+  const selectedYear = tkYearSelect.value || 'Tất cả năm học';
+  const selectedSemester = tkSemesterSelect.value ? `Học kỳ ${tkSemesterSelect.value}` : 'Tất cả học kỳ';
+  document.getElementById('tkMeta').textContent=`Đã chọn ${tkSelected.size}/${tkAllClasses.length} lớp | ${selectedSchool} | ${selectedYear} | ${selectedSemester}`;
+}
+
+function renderTKClassList(){
+  tkClassList.innerHTML='';
+  const filtered = getFilteredClasses();
+  if(!filtered.length){
+    tkClassList.innerHTML='<div style="font-size:13px;color:#55617e;text-align:center">Không có lớp phù hợp</div>';
+    updateTKMetaText();
+    return;
+  }
+  const frag=document.createDocumentFragment();
+  filtered.forEach(k=>{
+    const row=document.createElement('label');
+    row.className='tk-item';
+    const cb=document.createElement('input');
+    cb.type='checkbox';
+    cb.checked=tkSelected.has(k);
+    cb.addEventListener('change',()=>{ if(cb.checked) tkSelected.add(k); else tkSelected.delete(k); updateTKSummary(); updateTKMetaText();});
+    const span=document.createElement('span');
+    span.textContent=k;
+    row.appendChild(cb); row.appendChild(span); frag.appendChild(row);
+  });
+  tkClassList.appendChild(frag);
+  updateTKMetaText();
+}
+
+function isCode(s,h){ return s[h+'r']!=='' && s[h]===null; }
+function calcTB(s){ if(isCode(s,'hp1')||isCode(s,'hp2')||isCode(s,'hp3')||isCode(s,'hp4')) return null; if(s.hp1==null||s.hp2==null||s.hp3==null||s.hp4==null) return null; return Math.round((s.hp1*3+s.hp2*2+s.hp3+s.hp4*2)/8*100)/100; }
+function category(s){
+  const raw=[String(s.hp1r||'').toUpperCase(),String(s.hp2r||'').toUpperCase(),String(s.hp3r||'').toUpperCase(),String(s.hp4r||'').toUpperCase()];
+  if(raw.some(v=>v==='CT')) return 'ct';
+  if(raw.some(v=>v==='VT')) return 'vt';
+  if(raw.some(v=>v==='DC'||v==='DINHCHI'||v==='ĐC')) return 'dc';
+  const tb=calcTB(s);
+  if(s.hp1==null||s.hp2==null||s.hp3==null||s.hp4==null) return 'hong';
+  if(s.hp1<5||s.hp2<5||s.hp3<5||s.hp4<5||tb===null) return 'hong';
+  if(tb>=8.95) return 'sx';
+  if(tb>=7.95) return 'g';
+  if(tb>=6.95) return 'kha';
+  if(tb>=5.95) return 'tb';
+  return 'hong';
+}
+
+function classStats(k){
+  const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
+  const grp=tkByLop[k]; if(!grp) return out;
+  (grp.students||[]).forEach(s=>{ const c=category(s); out[c]++; out.total++; });
+  return out;
+}
+function statsFromSelection(){
+  const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
+  [...tkSelected].forEach(k=>{ const c=classStats(k); Object.keys(out).forEach(key=>{ out[key]+=c[key]||0; });});
+  return out;
+}
+function pct(n,total){ return total?((n*100)/total).toFixed(2):'0.00'; }
+
+function renderClassStatsTable(){
+  const keys=[...tkSelected].sort();
+  if(!keys.length){ tkClassTableBody.innerHTML='<tr><td class="l" colspan="11">Chưa chọn lớp nào</td></tr>'; return; }
+  tkClassTableBody.innerHTML = keys.map(k=>{
+    const s=classStats(k); const pass=s.sx+s.g+s.kha+s.tb;
+    return `<tr><td class="l">${k}</td><td>${s.total}</td><td>${s.sx}</td><td>${s.g}</td><td>${s.kha}</td><td>${s.tb}</td><td>${s.ct}</td><td>${s.vt}</td><td>${s.dc}</td><td>${s.hong}</td><td>${pct(pass,s.total)}%</td></tr>`;
+  }).join('');
+}
+
+function renderClassCards(){
+  const keys=[...tkSelected].sort();
+  if(!keys.length){
+    tkClassCards.innerHTML='<div class="tk-class-card"><h6>Chưa có lớp nào được chọn</h6><div class="r"><span>Tỷ lệ đạt</span><span>0%</span></div></div>';
+    return;
+  }
+  tkClassCards.innerHTML = keys.map(k=>{
+    const s=classStats(k);
+    const pass=s.sx+s.g+s.kha+s.tb;
+    return `<div class="tk-class-card">
+      <h6>${k}</h6>
+      <div class="r"><span>Tổng SV</span><span>${s.total}</span></div>
+      <div class="r"><span>Đạt</span><span>${pass} (${pct(pass,s.total)}%)</span></div>
+      <div class="r"><span>Không đạt</span><span>${s.total-pass} (${pct(s.total-pass,s.total)}%)</span></div>
+      <div class="r"><span>SX/G/Khá/TB</span><span>${s.sx}/${s.g}/${s.kha}/${s.tb}</span></div>
+      <div class="r"><span>CT/VT/DC/Hỏng</span><span>${s.ct}/${s.vt}/${s.dc}/${s.hong}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function updateTKSummary(){
+  const s=statsFromSelection(); const pass=s.sx+s.g+s.kha+s.tb; const fail=s.ct+s.vt+s.dc+s.hong;
+  document.getElementById('kpiTotal').textContent=s.total;
+  document.getElementById('kpiClass').textContent=tkSelected.size;
+  document.getElementById('kpiPass').textContent=`${pct(pass,s.total)}%`;
+  document.getElementById('kpiFail').textContent=`${pct(fail,s.total)}%`;
+  document.getElementById('tkSX').textContent=`${s.sx} (${pct(s.sx,s.total)}%)`;
+  document.getElementById('tkG').textContent=`${s.g} (${pct(s.g,s.total)}%)`;
+  document.getElementById('tkKha').textContent=`${s.kha} (${pct(s.kha,s.total)}%)`;
+  document.getElementById('tkTB').textContent=`${s.tb} (${pct(s.tb,s.total)}%)`;
+  document.getElementById('tkCT').textContent=`${s.ct} (${pct(s.ct,s.total)}%)`;
+  document.getElementById('tkVT').textContent=`${s.vt} (${pct(s.vt,s.total)}%)`;
+  document.getElementById('tkDC').textContent=`${s.dc} (${pct(s.dc,s.total)}%)`;
+  document.getElementById('tkHong').textContent=`${s.hong} (${pct(s.hong,s.total)}%)`;
+  renderClassCards();
+  renderClassStatsTable();
+}
+
+function exportTK(){
+  const s=statsFromSelection();
+  if(!s.total){ setStatus('Chưa có dữ liệu thống kê để xuất', 'warn'); return; }
+  const wb=XLSX.utils.book_new();
+  const pass=s.sx+s.g+s.kha+s.tb;
+  const aoa=[
+    ['THONG KE KET QUA GDQP'],['Tong SV', s.total],['Ty le dat', pct(pass,s.total)+'%'],['Ty le khong dat', pct(s.total-pass,s.total)+'%'],[],
+    ['Dat'],['Xuat sac', s.sx, 'TL', pct(s.sx,s.total)+'%'],['Gioi', s.g, 'TL', pct(s.g,s.total)+'%'],['Kha', s.kha, 'TL', pct(s.kha,s.total)+'%'],['Trung binh', s.tb, 'TL', pct(s.tb,s.total)+'%'],[],
+    ['Khong dat'],['Cam thi', s.ct, 'TL', pct(s.ct,s.total)+'%'],['Vang thi', s.vt, 'TL', pct(s.vt,s.total)+'%'],['Dinh chi', s.dc, 'TL', pct(s.dc,s.total)+'%'],['Hong', s.hong, 'TL', pct(s.hong,s.total)+'%'],[],
+    ['Theo tung lop da chon'],['Lop','Tong','SX','G','Kha','TB','CT','VT','DC','Hong','Ty le dat']
+  ];
+  [...tkSelected].sort().forEach(k=>{ const c=classStats(k); const p=c.sx+c.g+c.kha+c.tb; aoa.push([k,c.total,c.sx,c.g,c.kha,c.tb,c.ct,c.vt,c.dc,c.hong,pct(p,c.total)+'%']); });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:30},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:15}];
+  XLSX.utils.book_append_sheet(wb, ws, 'ThongKe');
+
+  [...tkSelected].sort().forEach(k=>{
+    const c=classStats(k);
+    const passClass=c.sx+c.g+c.kha+c.tb;
+    const aoaClass=[
+      ['THONG KE LOP', k],
+      ['Tong SV', c.total],
+      ['Ty le dat', pct(passClass,c.total)+'%'],
+      ['Ty le khong dat', pct(c.total-passClass,c.total)+'%'],
+      [],
+      ['Dat'],
+      ['Xuat sac', c.sx],
+      ['Gioi', c.g],
+      ['Kha', c.kha],
+      ['Trung binh', c.tb],
+      [],
+      ['Khong dat'],
+      ['Cam thi', c.ct],
+      ['Vang thi', c.vt],
+      ['Dinh chi', c.dc],
+      ['Hong', c.hong],
+    ];
+    const wsClass = XLSX.utils.aoa_to_sheet(aoaClass);
+    wsClass['!cols']=[{wch:30},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsClass, ('Lop_'+k).replace(/[\\\/\?\*\[\]:]/g,'_').substring(0,31));
+  });
+
+  const d=new Date();
+  const fn='ThongKe_GDQP_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx';
+  XLSX.writeFile(wb, fn, {bookSST:false, type:'binary'});
+  setStatus('Đã xuất file thống kê', 'ok');
+}
+
+hydrateTKFromSession();
+hydrateFullSourceFromSession();
+hydrateEditRecords();
+</script>
+</body>
+</html>
