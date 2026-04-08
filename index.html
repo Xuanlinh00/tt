@@ -69,6 +69,9 @@ body{font-family:"Times New Roman",Georgia,serif;background:linear-gradient(160d
 .tk-item input{width:15px;height:15px}
 .tk-meta{margin-top:8px;font-size:12px;color:#4b5f88}
 .tk-main{display:flex;flex-direction:column;gap:12px}
+.tk-mode-tabs{display:flex;gap:8px}
+.tk-mode-tab{border:1px solid #9aaad0;background:#f7f9ff;font-family:inherit;padding:7px 12px;font-size:13px;cursor:pointer;border-radius:8px;color:#1d3058;font-weight:bold}
+.tk-mode-tab.on{background:#1e3159;color:#fff;border-color:#1e3159}
 .tk-overview{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}
 .tk-kpi{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fbfcff}
 .tk-kpi .n{font-size:22px;font-weight:bold;color:#102a5d}
@@ -192,6 +195,11 @@ body{font-family:"Times New Roman",Georgia,serif;background:linear-gradient(160d
           </aside>
 
           <section class="tk-main">
+            <div class="tk-mode-tabs">
+              <button class="tk-mode-tab on" id="tkModeBGD" type="button">Thống kê BGD</button>
+              <button class="tk-mode-tab" id="tkModeBLD" type="button">Thống kê BLD</button>
+            </div>
+
             <div class="tk-overview">
               <div class="tk-kpi"><div class="n" id="kpiTotal">0</div><div class="l">Tổng SV</div></div>
               <div class="tk-kpi"><div class="n" id="kpiClass">0</div><div class="l">Lớp đã chọn</div></div>
@@ -260,11 +268,10 @@ body{font-family:"Times New Roman",Georgia,serif;background:linear-gradient(160d
               <div><b>MSSV:</b> <span id="editInfoMaSV">-</span></div>
               <div><b>Họ và tên:</b> <span id="editInfoName">-</span></div>
               <div><b>Ngày sinh:</b> <span id="editInfoBirth">-</span></div>
-              <div><b>Điểm lần 1:</b> <span id="editInfoScore1">-</span></div>
+              <div><b>Điểm công bố:</b> <span id="editInfoScore1">-</span></div>
             </div>
             <div class="edit-row" style="margin-top:10px">
-              <input class="tk-search" id="editNewScoreInput" placeholder="Nhập điểm chỉnh sửa (lần 2)" style="min-width:220px">
-              <button class="tk-mini" id="editSaveBtn">Lưu chỉnh sửa</button>
+             <input class="tk-search" id="editNewScoreInput" placeholder="Nhập điểm chưa lên điểm" style="min-width:220px">              <button class="tk-mini" id="editSaveBtn">Lưu chỉnh sửa</button>
             </div>
             <div class="edit-status" id="editStatus">Chưa có dữ liệu chỉnh sửa</div>
           </div>
@@ -277,13 +284,11 @@ body{font-family:"Times New Roman",Georgia,serif;background:linear-gradient(160d
               </select>
               <button class="tk-mini" id="editExportBtn">Xuất Excel</button>
             </div>
-            <div class="edit-note">File đầy đủ được tải ở thanh trên cùng. Tab này dùng để tìm sinh viên cần chỉnh và lưu điểm lần 2.</div>
-            <div class="edit-table-wrap">
+            <div class="edit-note">File đầy đủ được tải ở thanh trên cùng. Tab này dùng để tìm sinh viên cần chỉnh và lưu điểm chưa lên điểm.</div>            <div class="edit-table-wrap">
               <table class="tk-table">
                 <thead>
                   <tr>
-                    <th>Mã môn</th><th>MSSV</th><th>Họ và</th><th>Tên</th><th>Ngày sinh</th><th>Điểm lần 1</th><th>Điểm lần 2</th>
-                  </tr>
+                  <th>Mã môn</th><th>MSSV</th><th>Họ và</th><th>Tên</th><th>Ngày sinh</th><th>Điểm công bố</th><th>Chưa lên điểm</th>                  </tr>
                 </thead>
                 <tbody id="editListBody">
                   <tr><td class="l" colspan="7">Chưa có bản ghi chỉnh sửa</td></tr>
@@ -314,14 +319,18 @@ const SS_KEY_FULL_ROWS = 'gdqp_full_rows';
 const SS_KEY_EDIT = 'gdqp_edited_scores';
 const SS_KEY_MAIN_ROWS = 'gdqp_main_rows';
 const SS_KEY_ACTIVE_MENU = 'gdqp_active_menu';
+const BLD_SUBJECT_CODES = new Set(['190036','190008','195001']);
 
 let tkByLop = {};
+let tkByLopBGD = {};
+let tkByLopBLD = {};
 let tkAllClasses = [];
 let tkSelected = new Set();
 let tkRawRows = [];
 let tkCols = null;
 let tkAllSchools = [];
 let tkAllYears = [];
+let tkMode = 'bgd';
 let pendingMainFile = null;
 let pendingBirthFile = null;
 let pendingBldMainFile = null;
@@ -471,11 +480,13 @@ function hydrateTKFromSession(){
 
   try{
     const data = JSON.parse(raw);
-    tkByLop = {};
+    tkByLopBGD = {};
+    tkByLopBLD = {};
     Object.entries(data).forEach(([lop, grp])=>{
       const students = Array.isArray(grp.students) ? grp.students : Object.values(grp.students||{});
-      tkByLop[lop] = {students};
+      tkByLopBGD[lop] = {students};
     });
+    tkByLop = tkMode === 'bld' ? tkByLopBLD : tkByLopBGD;
     tkAllClasses = Object.keys(tkByLop).sort();
     tkSelected = new Set();
     renderTKClassList();
@@ -581,6 +592,8 @@ const tkSearch = document.getElementById('tkSearch');
 const tkSchoolSelect = document.getElementById('tkSchoolSelect');
 const tkYearSelect = document.getElementById('tkYearSelect');
 const tkSemesterSelect = document.getElementById('tkSemesterSelect');
+const tkModeBGDBtn = document.getElementById('tkModeBGD');
+const tkModeBLDBtn = document.getElementById('tkModeBLD');
 const editSubjectSelect = document.getElementById('editSubjectSelect');
 const editStudentInput = document.getElementById('editStudentInput');
 const editLoadBtn = document.getElementById('editLoadBtn');
@@ -596,6 +609,8 @@ tkSearch.addEventListener('input', renderTKClassList);
 tkSchoolSelect.addEventListener('change', applyTKFilters);
 tkYearSelect.addEventListener('change', applyTKFilters);
 tkSemesterSelect.addEventListener('change', applyTKFilters);
+if(tkModeBGDBtn) tkModeBGDBtn.addEventListener('click', ()=>switchTKMode('bgd'));
+if(tkModeBLDBtn) tkModeBLDBtn.addEventListener('click', ()=>switchTKMode('bld'));
 editLoadBtn.addEventListener('click', loadEditStudent);
 editSaveBtn.addEventListener('click', saveEditedScore);
 editExportBtn.addEventListener('click', exportEditedScores);
@@ -650,10 +665,12 @@ function detectCols(sample){
     maMH: find('MaMH','mamh'),
     score: keys.find(k=>{const v=nk(k); return v==='t1'||v.includes('dtkl1')||v.includes('diemthi1')||v.includes('diemtongketlan1');})||null,
     t1: find('T1','T1_DTK L1','T1_DTKL1','DTK L1','DTKL1'),
+    diemTB: find('DiemTB','Diem TB','T1_DTK L1','T1_DTKL1','T1DTKL1','T1_ĐTK L1'),
+    t1DTK: find('T1_DTK','T1ĐTK','T1DTK'),
     namHoc: find('Namhoc','NamHoc','Nam_hoc','Nam hoc'),
     hocKy: find('hocky','HocKy','Hoc_ky','Hoc ky'),
     nhhk: find('NHHK','NHHK'),
-    nhomTo: find('NhomTo','Nhomto','Nhom To'),
+  nhomTo: find('NhomHoc','Nhom hoc','Nhom_hoc','NhomTo','Nhomto','Nhom To'),
     gcNhapDiem: find('GcNhapDiem','GcNhap diem','GhiChuNhapDiem','GhiChu'),
     school: find('Truong','SchoolName','TenDT','TenTruong','DonViDaoTao','CoSoDaoTao'),
     year: find('NamHoc','Namhoc','NienKhoa','Nienkhoa'),
@@ -696,6 +713,125 @@ function normalizeSemesterValue(value){
   if(v === '1' || v === 'HK1' || v === 'HOCKY1' || v.includes('KỲ 1') || v.includes('KI 1') || v.includes('KY 1')) return '1';
   if(v === '2' || v === 'HK2' || v === 'HOCKY2' || v.includes('KỲ 2') || v.includes('KI 2') || v.includes('KY 2')) return '2';
   return '';
+}
+
+function normalizeSubjectCode(code){
+  const text = String(code || '').trim();
+  if(text === '1190036') return '190036';
+  return text;
+}
+
+function parseScoreValue(rawValue){
+  const raw = rawValue === null || rawValue === undefined ? '' : String(rawValue).trim();
+  if(!raw) return { raw:'', score:null };
+  const n = parseFloat(raw.replace(',', '.'));
+  return { raw, score: Number.isFinite(n) ? n : null };
+}
+
+function getBLDScoreFromRow(row){
+  if(!tkCols) return { raw:'', score:null };
+  const candidates = [
+    tkCols.diemTB,
+    tkCols.t1,
+    tkCols.t1DTK,
+    tkCols.score
+  ].filter(Boolean);
+
+  for(const key of candidates){
+    if(row[key] === null || row[key] === undefined) continue;
+    const parsed = parseScoreValue(row[key]);
+    if(parsed.raw !== '') return parsed;
+  }
+  return { raw:'', score:null };
+}
+
+function buildBGDDataByClass(rows){
+  const col = tkCols;
+  const byClass = {};
+  rows.forEach((r)=>{
+    const maMH = col.maMH && r[col.maMH] != null ? String(r[col.maMH]).trim() : '';
+    const hp = HP_MAP[maMH];
+    if(!hp) return;
+
+    const maSV = col.maSV && r[col.maSV] != null ? String(r[col.maSV]).trim() : '';
+    if(!maSV) return;
+    const maLop = col.maLop && r[col.maLop] != null ? String(r[col.maLop]).trim() : 'Không rõ';
+
+    if(!byClass[maLop]) byClass[maLop] = { students:{} };
+    if(!byClass[maLop].students[maSV]){
+      byClass[maLop].students[maSV] = {
+        maSV,
+        hoLot: col.hoLot ? (r[col.hoLot] || '') : '',
+        ten: col.ten ? (r[col.ten] || '') : '',
+        hp1:null,hp2:null,hp3:null,hp4:null,
+        hp1r:'',hp2r:'',hp3r:'',hp4r:''
+      };
+    }
+
+    const sv = byClass[maLop].students[maSV];
+    const parsed = parseScoreValue(col.score ? r[col.score] : null);
+    const oldRaw = sv['hp'+hp+'r'] || '';
+    if(parsed.raw !== '' || oldRaw === ''){
+      sv['hp'+hp] = parsed.score;
+      sv['hp'+hp+'r'] = parsed.raw;
+    }
+  });
+
+  Object.values(byClass).forEach((g)=>{ g.students = Object.values(g.students); });
+  return byClass;
+}
+
+function buildBLDDataByClass(rows){
+  const col = tkCols;
+  const byClass = {};
+  rows.forEach((r)=>{
+    const maMH = normalizeSubjectCode(col.maMH && r[col.maMH] != null ? r[col.maMH] : '');
+    if(!BLD_SUBJECT_CODES.has(maMH)) return;
+
+    const maSV = col.maSV && r[col.maSV] != null ? String(r[col.maSV]).trim() : '';
+    if(!maSV) return;
+    const maLop = col.maLop && r[col.maLop] != null ? String(r[col.maLop]).trim() : 'Không rõ';
+    const parsed = getBLDScoreFromRow(r);
+
+    if(!byClass[maLop]) byClass[maLop] = { students:{} };
+
+    const old = byClass[maLop].students[maSV];
+    const next = {
+      maSV,
+      score: parsed.score,
+      raw: parsed.raw,
+      maMH
+    };
+
+    if(!old){
+      byClass[maLop].students[maSV] = next;
+      return;
+    }
+
+    const oldScore = Number.isFinite(old.score) ? old.score : -1;
+    const nextScore = Number.isFinite(next.score) ? next.score : -1;
+    if(nextScore > oldScore){
+      byClass[maLop].students[maSV] = next;
+    }
+  });
+
+  Object.values(byClass).forEach((g)=>{ g.students = Object.values(g.students); });
+  return byClass;
+}
+
+function switchTKMode(mode){
+  tkMode = mode === 'bld' ? 'bld' : 'bgd';
+  if(tkModeBGDBtn) tkModeBGDBtn.classList.toggle('on', tkMode === 'bgd');
+  if(tkModeBLDBtn) tkModeBLDBtn.classList.toggle('on', tkMode === 'bld');
+  syncTKDatasetByMode();
+}
+
+function syncTKDatasetByMode(){
+  tkByLop = tkMode === 'bld' ? tkByLopBLD : tkByLopBGD;
+  tkAllClasses = Object.keys(tkByLop).sort();
+  tkSelected = new Set([...tkSelected].filter((k)=>tkAllClasses.includes(k)));
+  renderTKClassList();
+  updateTKSummary();
 }
 
 function collectTKFilterOptions(){
@@ -1176,6 +1312,8 @@ function exportEditedScores(){
 function applyTKFilters(){
   if(!tkCols){
     tkByLop = {};
+    tkByLopBGD = {};
+    tkByLopBLD = {};
     tkAllClasses = [];
     tkSelected = new Set();
     renderTKClassList();
@@ -1206,33 +1344,9 @@ function applyTKFilters(){
     return true;
   });
 
-  const col = tkCols;
-  tkByLop = {};
-  filteredRows.forEach(r=>{
-    const maMH = r[col.maMH]!=null?String(r[col.maMH]).trim():'';
-    const hp = HP_MAP[maMH];
-    if(!hp) return;
-    const maSV = r[col.maSV]!=null?String(r[col.maSV]).trim():'';
-    if(!maSV) return;
-    const maLop = r[col.maLop]!=null?String(r[col.maLop]).trim():'Không rõ';
-    if(!tkByLop[maLop]) tkByLop[maLop] = {students:{}};
-    if(!tkByLop[maLop].students[maSV]){
-      tkByLop[maLop].students[maSV] = {maSV,hoLot:r[col.hoLot]||'',ten:r[col.ten]||'',hp1:null,hp2:null,hp3:null,hp4:null,hp1r:'',hp2r:'',hp3r:'',hp4r:''};
-    }
-    const sv = tkByLop[maLop].students[maSV];
-    const raw = (r[col.score]!==null&&r[col.score]!==undefined)?String(r[col.score]).trim():'';
-    const n = raw!==''?parseFloat(raw):NaN;
-    const oldRaw = sv['hp'+hp+'r']||'';
-    if(raw!=='' || oldRaw===''){
-      sv['hp'+hp] = (!isNaN(n)&&raw!=='')?n:null;
-      sv['hp'+hp+'r'] = raw;
-    }
-  });
-  Object.values(tkByLop).forEach(g=>{ g.students = Object.values(g.students); });
-  tkAllClasses = Object.keys(tkByLop).sort();
-  tkSelected = new Set([...tkSelected].filter((k)=>tkAllClasses.includes(k)));
-  renderTKClassList();
-  updateTKSummary();
+  tkByLopBGD = buildBGDDataByClass(filteredRows);
+  tkByLopBLD = buildBLDDataByClass(filteredRows);
+  syncTKDatasetByMode();
 }
 
 function norm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d').replace(/\s+/g,''); }
@@ -1242,7 +1356,8 @@ function updateTKMetaText(){
   const selectedSchool = tkSchoolSelect.value || 'Tất cả trường';
   const selectedYear = tkYearSelect.value || 'Tất cả năm học';
   const selectedSemester = tkSemesterSelect.value ? `Học kỳ ${tkSemesterSelect.value}` : 'Tất cả học kỳ';
-  document.getElementById('tkMeta').textContent=`Đã chọn ${tkSelected.size}/${tkAllClasses.length} lớp | ${selectedSchool} | ${selectedYear} | ${selectedSemester}`;
+  const modeText = tkMode === 'bld' ? 'BLD' : 'BGD';
+  document.getElementById('tkMeta').textContent=`Chế độ ${modeText} | Đã chọn ${tkSelected.size}/${tkAllClasses.length} lớp | ${selectedSchool} | ${selectedYear} | ${selectedSemester}`;
 }
 
 function renderTKClassList(){
@@ -1271,7 +1386,7 @@ function renderTKClassList(){
 
 function isCode(s,h){ return s[h+'r']!=='' && s[h]===null; }
 function calcTB(s){ if(isCode(s,'hp1')||isCode(s,'hp2')||isCode(s,'hp3')||isCode(s,'hp4')) return null; if(s.hp1==null||s.hp2==null||s.hp3==null||s.hp4==null) return null; return Math.round((s.hp1*3+s.hp2*2+s.hp3+s.hp4*2)/8*100)/100; }
-function category(s){
+function categoryBGD(s){
   const raw=[String(s.hp1r||'').toUpperCase(),String(s.hp2r||'').toUpperCase(),String(s.hp3r||'').toUpperCase(),String(s.hp4r||'').toUpperCase()];
   if(raw.some(v=>v==='CT')) return 'ct';
   if(raw.some(v=>v==='VT')) return 'vt';
@@ -1286,10 +1401,29 @@ function category(s){
   return 'hong';
 }
 
+function categoryBLD(s){
+  const raw = String(s.raw || '').trim().toUpperCase();
+  if(raw === 'CT') return 'ct';
+  if(raw === 'VT') return 'vt';
+  if(raw === 'DC' || raw === 'DINHCHI' || raw === 'ĐC') return 'dc';
+
+  const score = Number(s.score);
+  if(!Number.isFinite(score)) return 'hong';
+  if(score >= 9) return 'sx';
+  if(score >= 8) return 'g';
+  if(score >= 6.5) return 'kha';
+  if(score >= 5) return 'tb';
+  return 'hong';
+}
+
 function classStats(k){
   const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
   const grp=tkByLop[k]; if(!grp) return out;
-  (grp.students||[]).forEach(s=>{ const c=category(s); out[c]++; out.total++; });
+  (grp.students||[]).forEach(s=>{
+    const c=tkMode==='bld' ? categoryBLD(s) : categoryBGD(s);
+    out[c]++;
+    out.total++;
+  });
   return out;
 }
 function statsFromSelection(){
@@ -1351,8 +1485,9 @@ function exportTK(){
   if(!s.total){ setStatus('Chưa có dữ liệu thống kê để xuất', 'warn'); return; }
   const wb=XLSX.utils.book_new();
   const pass=s.sx+s.g+s.kha+s.tb;
+  const modeLabel = tkMode === 'bld' ? 'BLD' : 'BGD';
   const aoa=[
-    ['THONG KE KET QUA GDQP'],['Tong SV', s.total],['Ty le dat', pct(pass,s.total)+'%'],['Ty le khong dat', pct(s.total-pass,s.total)+'%'],[],
+    [`THONG KE KET QUA GDQP - ${modeLabel}`],['Tong SV', s.total],['Ty le dat', pct(pass,s.total)+'%'],['Ty le khong dat', pct(s.total-pass,s.total)+'%'],[],
     ['Dat'],['Xuat sac', s.sx, 'TL', pct(s.sx,s.total)+'%'],['Gioi', s.g, 'TL', pct(s.g,s.total)+'%'],['Kha', s.kha, 'TL', pct(s.kha,s.total)+'%'],['Trung binh', s.tb, 'TL', pct(s.tb,s.total)+'%'],[],
     ['Khong dat'],['Cam thi', s.ct, 'TL', pct(s.ct,s.total)+'%'],['Vang thi', s.vt, 'TL', pct(s.vt,s.total)+'%'],['Dinh chi', s.dc, 'TL', pct(s.dc,s.total)+'%'],['Hong', s.hong, 'TL', pct(s.hong,s.total)+'%'],[],
     ['Theo tung lop da chon'],['Lop','Tong','SX','G','Kha','TB','CT','VT','DC','Hong','Ty le dat']
@@ -1389,7 +1524,7 @@ function exportTK(){
   });
 
   const d=new Date();
-  const fn='ThongKe_GDQP_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx';
+  const fn='ThongKe_'+modeLabel+'_GDQP_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx';
   XLSX.writeFile(wb, fn, {bookSST:false, type:'binary'});
   setStatus('Đã xuất file thống kê', 'ok');
 }

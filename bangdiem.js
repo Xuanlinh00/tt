@@ -499,20 +499,26 @@ function renderQDTabs(){
     return;
   }
   if(!keys.includes(activeQD)) activeQD=keys[0];
-  keys.forEach(k=>{
-    const btn=document.createElement('button');
-    btn.className='tabbtn'+(k===activeQD?' on':'');
-    btn.textContent=k; btn.title=k;
-    btn.onclick=()=>{activeQD=k;renderQDTabs()};
-    tabrow.appendChild(btn);
-  });
-  drawQDTable(activeQD);
+  tabrow.innerHTML=`<div class="empty" style="padding:10px 14px">Đang gộp ${keys.length} lớp vào một danh sách quyết định chung</div>`;
+  drawQDTable();
 }
 
-function drawQDTable(key){
-  if(!key||!byLop[key])return;
+function getQDCombinedList(keys){
+  const merged=[];
+  keys.forEach(key=>{
+    const group=byLop[key];
+    if(!group) return;
+    group.students.forEach(s=>merged.push({...s, maLop:key}));
+  });
+  merged.sort((a,b)=>a.maLop.localeCompare(b.maLop)||a.maSV.localeCompare(b.maSV));
+  if(!qdChiDat) return merged;
+  return merged.filter(s=>{const tb=calcTB(s);return ketQua(xepLoai(s,tb))==='Đạt'});
+}
+
+function drawQDTable(){
+  const keys=[...selLop].sort();
+  if(!keys.length)return;
   const cfg = getExportSettings();
-  const{maLop,students}=byLop[key];
   const nguoiKy= cfg.nguoiKy;
   const chucVu = cfg.chucVu;
   const school = cfg.school;
@@ -520,9 +526,7 @@ function drawQDTable(key){
   const centerBottom = cfg.centerBottom;
   const xdate  = cfg.xdate;
 
-  const list = qdChiDat
-    ? students.filter(s=>{const tb=calcTB(s);return ketQua(xepLoai(s,tb))==='Đạt'})
-    : students;
+  const list = getQDCombinedList(keys);
 
   const tbody=list.map((s,i)=>{
     const tb=calcTB(s); const xl=xepLoai(s,tb);
@@ -531,7 +535,7 @@ function drawQDTable(key){
       <td class="L">${s.hoLot}</td><td>${s.ten}</td><td>${s.ngay}</td>
       <td class="L">${s.noiSinh||''}</td>
       <td class="bold">${allHPAreCT(s)?'CT':(tb!==null?tb.toFixed(1):'')}</td>
-      <td>${xl}</td><td></td><td class="L">${maLop}</td>
+      <td>${xl}</td><td></td><td class="L">${s.maLop}</td>
     </tr>`;
   }).join('');
 
@@ -544,7 +548,7 @@ function drawQDTable(key){
     <div class="qd-preview">
       <div class="qd-filter-bar">
         <label>
-          <input type="checkbox" ${qdChiDat?'checked':''} onchange="qdChiDat=this.checked;drawQDTable('${key}')">
+          <input type="checkbox" ${qdChiDat?'checked':''} onchange="qdChiDat=this.checked;drawQDTable()">
           Chỉ hiển thị sinh viên <b>Đạt</b>
         </label>
         <span class="qd-stat">${chiDatLabel}</span>
@@ -845,8 +849,7 @@ function exportExcel(scope='all'){
 }
 
 function exportQuyetDinh(scope='all'){
-  let keys = scope==='current' ? (activeQD?[activeQD]:[]) : [...selLop].sort();
-  if(scope==='current' && !keys.length && selLop.size) keys=[[...selLop].sort()[0]];
+  const keys = [...selLop].sort();
   if(!keys.length){alert('Chưa chọn lớp nào!');return}
   const wb=XLSX.utils.book_new();
   const cfg = getExportSettings();
@@ -854,148 +857,140 @@ function exportQuyetDinh(scope='all'){
   const nguoiKy=cfg.nguoiKy, chucVu=cfg.chucVu;
   const M=(r1,c1,r2,c2)=>({s:{r:r1,c:c1},e:{r:r2,c:c2}});
 
-  keys.forEach(key=>{
-    const{maLop,students}=byLop[key];
-    const list=qdChiDat
-      ? students.filter(s=>{const tb=calcTB(s);return ketQua(xepLoai(s,tb))==='Đạt'})
-      : students;
-    const aoa=[];
-    aoa.push(['ĐẠI HỌC TRÀ VINH','','','','','CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM','','','','']);
-    aoa.push([centerTop,'','','','','Độc lập - Tự do - Hạnh phúc','','','','']);
-    aoa.push([centerBottom,'','','','',xdate,'','','','']);
-    aoa.push([]);
-    aoa.push(['DANH SÁCH CẤP CHỨNG CHỈ GIÁO DỤC QUỐC PHÒNG VÀ AN NINH','','','','','','','','','']);
-    aoa.push(['(Ban hành kèm theo Quyết định số      /QĐ-GDQP ngày      tháng      năm      )','','','','','','','','','']);
-    aoa.push([]);
-    aoa.push([]);
-    aoa.push(['TT','Mã SV','Họ Và','Tên','Ngày Sinh','Nơi Sinh','Điểm TB','Xếp Loại','Ghi Chú','Mã Lớp']);
+  const list=getQDCombinedList(keys);
+  const aoa=[];
+  aoa.push(['ĐẠI HỌC TRÀ VINH','','','','','CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM','','','','']);
+  aoa.push([centerTop,'','','','','Độc lập - Tự do - Hạnh phúc','','','','']);
+  aoa.push([centerBottom,'','','','',xdate,'','','','']);
+  aoa.push([]);
+  aoa.push(['DANH SÁCH CẤP CHỨNG CHỈ GIÁO DỤC QUỐC PHÒNG VÀ AN NINH','','','','','','','','','']);
+  aoa.push(['(Ban hành kèm theo Quyết định số      /QĐ-GDQP ngày      tháng      năm      )','','','','','','','','','']);
+  aoa.push([]);
+  aoa.push(['TT','Mã SV','Họ Và','Tên','Ngày Sinh','Nơi Sinh','Điểm TB','Xếp Loại','Ghi Chú','Mã Lớp']);
 
-    list.forEach((s,i)=>{
-      const tb=calcTB(s); const xl=xepLoai(s,tb);
-      aoa.push([i+1, s.maSV, s.hoLot, s.ten, s.ngay,
-        s.noiSinh||'',
-        allHPAreCT(s) ? 'CT' : (tb!==null ? tb : ''),
-        xl,
-        '',
-        maLop
-      ]);
-    });
-
-    const fi2=aoa.length; aoa.push([]);
-    aoa.push(['Trên danh sách có '+list.length+' sinh viên','','','','','','','','','']);
-    aoa.push([]);
-    const signerTitleText = String(chucVu || '').replace(' - ', '\n');
-    aoa.push(['','','','','','',signerTitleText,'','','']);
-    aoa.push([]);aoa.push([]);aoa.push([]);
-    aoa.push(['','','','','','',nguoiKy,'','','']);
-
-    const ws=XLSX.utils.aoa_to_sheet(aoa);
-    const signerTitleRow = fi2 + 3;
-    const signerNameRow = fi2 + 7;
-    ws['!merges']=[
-      M(0,0,0,4),M(0,5,0,9), M(1,0,1,4),M(1,5,1,9), M(2,0,2,4),M(2,5,2,9),
-      M(4,0,4,9),M(5,0,5,9),
-      M(fi2+1,0,fi2+1,9),
-      M(signerTitleRow,6,signerTitleRow,9),
-      M(signerNameRow,6,signerNameRow,9),
-    ];
-    setRowHeights(ws, [
-      {row:0, hpt:20}, {row:1, hpt:20}, {row:2, hpt:20},
-      {row:4, hpt:24}, {row:5, hpt:20}, {row:8, hpt:30},
-      {row:fi2+1, hpt:18}, {row:signerTitleRow, hpt:32}, {row:signerNameRow, hpt:18}
+  list.forEach((s,i)=>{
+    const tb=calcTB(s); const xl=xepLoai(s,tb);
+    aoa.push([i+1, s.maSV, s.hoLot, s.ten, s.ngay,
+      s.noiSinh||'',
+      allHPAreCT(s) ? 'CT' : (tb!==null ? tb : ''),
+      xl,
+      '',
+      s.maLop
     ]);
+  });
 
-    const borderStyle = {
-      top: { style: 'thin' },
-      bottom: { style: 'thin' },
-      left: { style: 'thin' },
-      right: { style: 'thin' }
-    };
+  const fi2=aoa.length; aoa.push([]);
+  aoa.push(['Trên danh sách có '+list.length+' sinh viên','','','','','','','','','']);
+  aoa.push([]);
+  const signerTitleText = String(chucVu || '').replace(' - ', '\n');
+  aoa.push(['','','','','','',signerTitleText,'','','']);
+  aoa.push([]);aoa.push([]);aoa.push([]);
+  aoa.push(['','','','','','',nguoiKy,'','','']);
 
-    applyRangeStyle(ws, 0, 0, 0, 4, {
-      font: { name: 'Times New Roman', sz: 12 },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 1, 2, 0, 4, {
-      font: { name: 'Times New Roman', sz: 12, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 0, 2, 5, 9, {
-      font: { name: 'Times New Roman', sz: 12, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 1, 1, 5, 9, {
-      font: { name: 'Times New Roman', sz: 12, bold: true, underline: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 2, 2, 5, 9, {
-      font: { name: 'Times New Roman', sz: 11, italic: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 4, 4, 0, 9, {
-      font: { name: 'Times New Roman', sz: 13, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 5, 5, 0, 9, {
-      font: { name: 'Times New Roman', sz: 11, italic: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    applyRangeStyle(ws, 8, 8, 0, 9, {
-      font: { name: 'Times New Roman', sz: 10, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  const signerTitleRow = fi2 + 3;
+  const signerNameRow = fi2 + 7;
+  ws['!merges']=[
+    M(0,0,0,4),M(0,5,0,9), M(1,0,1,4),M(1,5,1,9), M(2,0,2,4),M(2,5,2,9),
+    M(4,0,4,9),M(5,0,5,9),
+    M(fi2+1,0,fi2+1,9),
+    M(signerTitleRow,6,signerTitleRow,9),
+    M(signerNameRow,6,signerNameRow,9),
+  ];
+  setRowHeights(ws, [
+    {row:0, hpt:20}, {row:1, hpt:20}, {row:2, hpt:20},
+    {row:4, hpt:24}, {row:5, hpt:20}, {row:7, hpt:30},
+    {row:fi2+1, hpt:18}, {row:signerTitleRow, hpt:32}, {row:signerNameRow, hpt:18}
+  ]);
+
+  const borderStyle = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+
+  applyRangeStyle(ws, 0, 0, 0, 4, {
+    font: { name: 'Times New Roman', sz: 12 },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 1, 2, 0, 4, {
+    font: { name: 'Times New Roman', sz: 12, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 0, 2, 5, 9, {
+    font: { name: 'Times New Roman', sz: 12, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 1, 1, 5, 9, {
+    font: { name: 'Times New Roman', sz: 12, bold: true, underline: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 2, 2, 5, 9, {
+    font: { name: 'Times New Roman', sz: 11, italic: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 4, 4, 0, 9, {
+    font: { name: 'Times New Roman', sz: 13, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 5, 5, 0, 9, {
+    font: { name: 'Times New Roman', sz: 11, italic: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 7, 7, 0, 9, {
+    font: { name: 'Times New Roman', sz: 10, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+    border: borderStyle
+  });
+
+  ws['!cols']=[{wch:3.5},{wch:9},{wch:14.5},{wch:6.2},{wch:10.5},{wch:11},{wch:6},{wch:8},{wch:5},{wch:9.5}];
+  ws['!pageSetup'] = { paperSize: 9, orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 };
+  ws['!margins'] = { left: 0.25, right: 0.25, top: 0.3, bottom: 0.3, header: 0.2, footer: 0.2 };
+  for(let r=8; r<=8 + list.length - 1; r++){
+    applyRangeStyle(ws, r, r, 0, 9, {
+      font: { name: 'Times New Roman', sz: 10 },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
       border: borderStyle
     });
-
-    ws['!cols']=[{wch:3.5},{wch:9},{wch:14.5},{wch:6.2},{wch:10.5},{wch:11},{wch:6},{wch:8},{wch:5},{wch:9.5}];
-    ws['!pageSetup'] = { paperSize: 9, orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 };
-    ws['!margins'] = { left: 0.25, right: 0.25, top: 0.3, bottom: 0.3, header: 0.2, footer: 0.2 };
-    for(let r=9; r<=9 + list.length - 1; r++){
-      applyRangeStyle(ws, r, r, 0, 9, {
-        font: { name: 'Times New Roman', sz: 10 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: borderStyle
-      });
-      applyRangeStyle(ws, r, r, 2, 3, {
-        font: { name: 'Times New Roman', sz: 10 },
-        alignment: { horizontal: 'left', vertical: 'center', wrapText: false },
-        border: borderStyle
-      });
-      applyRangeStyle(ws, r, r, 4, 4, {
-        font: { name: 'Times New Roman', sz: 10 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
-        border: borderStyle
-      });
-      applyRangeStyle(ws, r, r, 6, 6, {
-        font: { name: 'Times New Roman', sz: 10 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: borderStyle
-      });
-    }
-    applyRangeStyle(ws, fi2+1, fi2+1, 0, 9, {
-      font: { name: 'Times New Roman', sz: 11, italic: true },
-      alignment: { horizontal: 'left', vertical: 'center', wrapText: true }
+    applyRangeStyle(ws, r, r, 2, 3, {
+      font: { name: 'Times New Roman', sz: 10 },
+      alignment: { horizontal: 'left', vertical: 'center', wrapText: false },
+      border: borderStyle
     });
-    applyRangeStyle(ws, signerTitleRow, signerNameRow, 0, 9, {
-      font: { name: 'Times New Roman', sz: 11 },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+    applyRangeStyle(ws, r, r, 4, 4, {
+      font: { name: 'Times New Roman', sz: 10 },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+      border: borderStyle
     });
-    applyRangeStyle(ws, signerTitleRow, signerTitleRow, 0, 9, {
-      font: { name: 'Times New Roman', sz: 11, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+    applyRangeStyle(ws, r, r, 6, 6, {
+      font: { name: 'Times New Roman', sz: 10 },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+      border: borderStyle
     });
-    applyRangeStyle(ws, signerNameRow, signerNameRow, 0, 9, {
-      font: { name: 'Times New Roman', sz: 11, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-    });
-    centerSheetCells(ws, signerTitleRow, signerNameRow, [6]);
-    XLSX.utils.book_append_sheet(wb,ws,(key+'_QD').replace(/[\\\/\?\*\[\]:]/g,'_').substring(0,31));
+  }
+  applyRangeStyle(ws, fi2+1, fi2+1, 0, 9, {
+    font: { name: 'Times New Roman', sz: 11, italic: true },
+    alignment: { horizontal: 'left', vertical: 'center', wrapText: true }
   });
+  applyRangeStyle(ws, signerTitleRow, signerNameRow, 0, 9, {
+    font: { name: 'Times New Roman', sz: 11 },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, signerTitleRow, signerTitleRow, 0, 9, {
+    font: { name: 'Times New Roman', sz: 11, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, signerNameRow, signerNameRow, 0, 9, {
+    font: { name: 'Times New Roman', sz: 11, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  centerSheetCells(ws, signerTitleRow, signerNameRow, [6]);
+  XLSX.utils.book_append_sheet(wb,ws, 'TongHop_QD');
 
   const t=new Date();
   const d = t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0');
-  const fileName = scope==='current'
-    ? `QuyetDinh_GDQP_${keys[0]}_${d}.xlsx`
-    : `QuyetDinh_GDQP_All_${d}.xlsx`;
+  const fileName = `QuyetDinh_GDQP_TongHop_${d}.xlsx`;
   XLSX.writeFile(wb, fileName, {bookSST:false, type:'binary', cellStyles:true});
 }
 
