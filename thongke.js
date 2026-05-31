@@ -234,14 +234,36 @@ function hasAnyBLDScoreBelow5(s){
   return false;
 }
 
+function isHpEmptyOrZero(score, raw) {
+  if (score === null || score === undefined) return true;
+  if (score === 0) return true;
+  var r = String(raw || '').trim();
+  if (r === '' || r === '0') return true;
+  return false;
+}
+
 function categoryBLD(s){
   var codes = [s.hp1r, s.hp2r, s.hp3r, s.hp4r].map(normalizeTKResultCode);
-  if(codes.indexOf('CT') >= 0) return 'ct';
-  if(codes.indexOf('VT') >= 0) return 'vt';
-  if(codes.indexOf('DC') >= 0) return 'dc';
+  
+  var allEmptyOrZero = isHpEmptyOrZero(s.hp1, s.hp1r) &&
+                       isHpEmptyOrZero(s.hp2, s.hp2r) &&
+                       isHpEmptyOrZero(s.hp3, s.hp3r) &&
+                       isHpEmptyOrZero(s.hp4, s.hp4r);
+  if(allEmptyOrZero) return 'chua_hoc';
+  
+  // Hỏng (VT hoặc điểm dưới 5) có mức ưu tiên cao nhất trong các lỗi
+  if(codes.indexOf('VT') >= 0) return 'hong';
   if(hasAnyBLDScoreBelow5(s)) return 'hong';
+  
+  // Đình chỉ (DC)
+  if(codes.indexOf('DC') >= 0) return 'dc';
+  
+  // Cấm thi (CT)
+  if(codes.indexOf('CT') >= 0) return 'ct';
+  
   var tb = calcBLDTB(s);
   if(tb === null) return 'hong';
+  
   if(tb >= 9)  return 'sx';
   if(tb >= 8)  return 'g';
   if(tb >= 7)  return 'kha';
@@ -255,8 +277,15 @@ function categoryBLD(s){
 function categoryBGD(s){
   var code = normalizeTKResultCode(s.raw);
   if(code==='CT') return 'ct';
-  if(code==='VT') return 'vt';
   if(code==='DC') return 'dc';
+  if(code==='VT') return 'hong';
+  
+  var rawStr = String(s.raw || '').trim();
+  var isZeroOrEmpty = (s.score === null || s.score === undefined || s.score === 0 || rawStr === '' || rawStr === '0');
+  if (isZeroOrEmpty) {
+    return 'chua_hoc';
+  }
+  
   var score = Number(s.score);
   if(!Number.isFinite(score)) return 'hong';
   if(score >= 9)  return 'sx';
@@ -270,7 +299,7 @@ function categoryBGD(s){
    Thống kê theo lớp / theo lựa chọn
 ───────────────────────────────────────────────────────────── */
 function classStats(k){
-  var out = {sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
+  var out = {sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,chua_hoc:0,total:0};
   var grp = tkByLop[k];
   if(!grp || !Array.isArray(grp.students)) return out;
   grp.students.forEach(function(s){
@@ -281,7 +310,7 @@ function classStats(k){
 }
 
 function statsFromSelection(){
-  var out = {sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
+  var out = {sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,chua_hoc:0,total:0};
   var arr = Array.isArray(tkSelected) ? tkSelected : [...tkSelected];
   arr.forEach(function(k){
     var c = classStats(k);
@@ -476,7 +505,7 @@ function renderClassCards(){
   el.innerHTML = keys.map(function(k){
     var s    = classStats(k);
     var pass = s.sx+s.g+s.kha+s.tb;
-    var fail = s.ct+s.vt+s.dc+s.hong;
+    var fail = s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
     return '<div class="tk-class-card">'
       + '<h6 style="font-size:13px;margin-bottom:6px;color:#152d5f;word-break:break-all">' + k + '</h6>'
       + '<div class="r"><span>Tổng SV</span><span><b>' + s.total + '</b></span></div>'
@@ -484,8 +513,8 @@ function renderClassCards(){
       + '<div class="r" style="color:#a83200"><span>Không đạt</span><span>' + fail + ' (' + pct(fail,s.total) + '%)</span></div>'
       + '<div class="r"><span>SX / G / Khá / TB</span><span style="font-size:12px">'
         + s.sx + '&nbsp;/&nbsp;' + s.g + '&nbsp;/&nbsp;' + s.kha + '&nbsp;/&nbsp;' + s.tb + '</span></div>'
-      + '<div class="r"><span>CT / VT / ĐC / Hỏng</span><span style="font-size:12px">'
-        + s.ct + '&nbsp;/&nbsp;' + s.vt + '&nbsp;/&nbsp;' + s.dc + '&nbsp;/&nbsp;' + s.hong + '</span></div>'
+      + '<div class="r"><span>CT / VT / ĐC / Hỏng / Chưa học</span><span style="font-size:12px">'
+        + s.ct + '&nbsp;/&nbsp;' + s.vt + '&nbsp;/&nbsp;' + s.dc + '&nbsp;/&nbsp;' + s.hong + '&nbsp;/&nbsp;' + s.chua_hoc + '</span></div>'
       + '</div>';
   }).join('');
 }
@@ -498,7 +527,7 @@ function renderClassStatsTable(){
   if(!tbody) return;
   var keys = [...tkSelected].sort();
   if(!keys.length){
-    tbody.innerHTML = '<tr><td class="l" colspan="11">Chưa chọn ' + getTKPrimaryPlural() + ' nào</td></tr>';
+    tbody.innerHTML = '<tr><td class="l" colspan="12">Chưa chọn ' + getTKPrimaryPlural() + ' nào</td></tr>';
     return;
   }
   tbody.innerHTML = keys.map(function(k){
@@ -515,6 +544,7 @@ function renderClassStatsTable(){
       + '<td style="color:#b04200">' + s.vt  + '</td>'
       + '<td style="color:#8a0000">' + s.dc  + '</td>'
       + '<td style="color:#6b0000">' + s.hong + '</td>'
+      + '<td style="color:#4a5568">' + s.chua_hoc + '</td>'
       + '<td><b>' + pct(pass,s.total) + '%</b></td>'
       + '</tr>';
   }).join('');
@@ -526,7 +556,7 @@ function renderClassStatsTable(){
 function updateTKSummary(){
   var s    = statsFromSelection();
   var pass = s.sx+s.g+s.kha+s.tb;
-  var fail = s.ct+s.vt+s.dc+s.hong;
+  var fail = s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
 
   function set(id, val){ var el=document.getElementById(id); if(el) el.textContent=val; }
 
@@ -543,6 +573,7 @@ function updateTKSummary(){
   set('tkVT',   s.vt   + ' (TL: ' + pct(s.vt,s.total)   + '%)');
   set('tkDC',   s.dc   + ' (TL: ' + pct(s.dc,s.total)   + '%)');
   set('tkHong', s.hong + ' (TL: ' + pct(s.hong,s.total) + '%)');
+  set('tkChuaHoc', s.chua_hoc + ' (TL: ' + pct(s.chua_hoc,s.total) + '%)');
 
   renderClassCards();
   renderClassStatsTable();
@@ -690,7 +721,7 @@ function getBGDBanReason(s){
   return reasons.join(', ');
 }
 
-function getBLDFailedSubjectsText(s){
+function getBLDFailedSubjectsText(s, filterWanted){
   var map = [
     {code:'190081', hp:'hp1'},
     {code:'190082', hp:'hp2'},
@@ -700,13 +731,38 @@ function getBLDFailedSubjectsText(s){
   var failed = [];
   map.forEach(function(item){
     var rawCode = normalizeTKResultCode(s[item.hp + 'r']);
-    if(rawCode === 'CT' || rawCode === 'VT' || rawCode === 'DC'){
-      failed.push(item.code + '(' + rawCode + ')');
+    
+    var subCate = '';
+    if(rawCode === 'CT') {
+      subCate = 'ct';
+    } else if(rawCode === 'DC') {
+      subCate = 'dc';
+    } else if(isHpEmptyOrZero(s[item.hp], s[item.hp + 'r'])) {
+      subCate = 'chua_hoc';
+    } else if(rawCode === 'VT') {
+      subCate = 'hong';
+    } else {
+      var score = Number(s[item.hp]);
+      if(Number.isFinite(score) && score < 5) {
+        subCate = 'hong';
+      }
+    }
+    
+    if(filterWanted && subCate !== filterWanted) {
       return;
     }
-    var score = Number(s[item.hp]);
-    if(Number.isFinite(score) && score < 5){
-      failed.push(item.code + '(' + score + ')');
+    
+    if(rawCode === 'CT' || rawCode === 'VT' || rawCode === 'DC'){
+      failed.push(item.code + '(' + rawCode + ')');
+    } else {
+      var score = Number(s[item.hp]);
+      if(Number.isFinite(score) && score < 5){
+        failed.push(item.code + '(' + score + ')');
+      } else if (rawCode === '0' || s[item.hp] === 0) {
+        failed.push(item.code + '(0)');
+      } else if (s[item.hp] === null || s[item.hp] === undefined) {
+        failed.push(item.code + '(Chưa điểm)');
+      }
     }
   });
   return failed.join(', ');
@@ -725,8 +781,8 @@ function getBGDFailedSubjectsText(s){
   return maMH;
 }
 
-function getStudentFailedSubjectsText(s){
-  return (tkMode === 'bld') ? getBLDFailedSubjectsText(s) : getBGDFailedSubjectsText(s);
+function getStudentFailedSubjectsText(s, filterWanted){
+  return (tkMode === 'bld') ? getBLDFailedSubjectsText(s, filterWanted) : getBGDFailedSubjectsText(s);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -771,26 +827,51 @@ function collectStudentsByResultCode(targetCode){
         var maLop = s.maLop || key || '';
         var hoLot = s.hoLot || '';
         var ten = s.ten || '';
-        var maMH = getStudentFailedSubjectsText(s);
+        var maMH = getStudentFailedSubjectsText(s, wanted);
         var ghiChu = String(s.raw || '').trim() || wanted.toUpperCase();
         rows.push([key, maLop, maSV, hoLot, ten, maMH, ghiChu]);
       });
     });
   } else {
+    var map = [
+      {code:'190081', hp:'hp1'},
+      {code:'190082', hp:'hp2'},
+      {code:'190083', hp:'hp3'},
+      {code:'190084', hp:'hp4'}
+    ];
     [...tkSelected].sort().forEach(function(key){
       var group = tkByLop[key];
       if(!group || !Array.isArray(group.students)) return;
       group.students.forEach(function(s){
-        var cate = categoryBLD(s);
-        if(cate !== wanted) return;
-        var maSV = s.maSV || '';
-        var hoLot = s.hoLot || '';
-        var ten = s.ten || '';
-        var maLop = s.maLop || '';
-        var maMH = getStudentFailedSubjectsText(s);
-        var rawText = String(s.raw || '').trim();
-        var ghiChu = rawText || wanted.toUpperCase();
-        rows.push([key, maLop, maSV, hoLot, ten, maMH, ghiChu]);
+        map.forEach(function(item){
+          var rawCode = normalizeTKResultCode(s[item.hp + 'r']);
+          var subCate = '';
+          if(rawCode === 'CT') {
+            subCate = 'ct';
+          } else if(rawCode === 'DC') {
+            subCate = 'dc';
+          } else if(isHpEmptyOrZero(s[item.hp], s[item.hp + 'r'])) {
+            subCate = 'chua_hoc';
+          } else if(rawCode === 'VT') {
+            subCate = 'hong';
+          } else {
+            var score = Number(s[item.hp]);
+            if(Number.isFinite(score) && score < 5) {
+              subCate = 'hong';
+            }
+          }
+
+          if(subCate !== wanted) return;
+
+          var maSV = s.maSV || '';
+          var hoLot = s.hoLot || '';
+          var ten = s.ten || '';
+          var maLop = s.maLop || '';
+          var maMH = item.code + '(' + (rawCode || (s[item.hp] !== null ? s[item.hp] : 'Chưa điểm')) + ')';
+          var rawText = String(s[item.hp + 'r'] || '').trim();
+          var ghiChu = rawText || wanted.toUpperCase();
+          rows.push([key, maLop, maSV, hoLot, ten, maMH, ghiChu]);
+        });
       });
     });
   }
@@ -836,13 +917,14 @@ function exportTKBanList(){
   }
 
   var bannedRows = collectStudentsByResultCode('ct');
-  var absentRows = collectStudentsByResultCode('vt');
+  var absentRows = collectStudentsByResultCode('vt'); // will be empty
   var suspendedRows = collectStudentsByResultCode('dc');
   var failedRows = collectStudentsByResultCode('hong');
-  var totalRows = bannedRows.length + absentRows.length + suspendedRows.length + failedRows.length;
+  var chuaHocRows = collectStudentsByResultCode('chua_hoc');
+  var totalRows = bannedRows.length + absentRows.length + suspendedRows.length + failedRows.length + chuaHocRows.length;
 
   if(!totalRows){
-    if(typeof setStatus === 'function') setStatus('Không có sinh viên CT/VT/DC/Hỏng trong lựa chọn hiện tại', 'warn');
+    if(typeof setStatus === 'function') setStatus('Không có sinh viên CT/VT/DC/Hỏng/Chưa học trong lựa chọn hiện tại', 'warn');
     return;
   }
 
@@ -857,18 +939,23 @@ function exportTKBanList(){
   bannedRows.forEach(function(row){ mergedRows.push(row.concat(['CT'])); });
   absentRows.forEach(function(row){ mergedRows.push(row.concat(['VT'])); });
   suspendedRows.forEach(function(row){ mergedRows.push(row.concat(['DC'])); });
-  failedRows.forEach(function(row){ mergedRows.push(row.concat(['Hỏng'])); });
+  failedRows.forEach(function(row){
+    var rawStatus = String(row[6] || '').trim().toUpperCase();
+    var label = (rawStatus === 'VT') ? 'VT' : 'Hỏng';
+    mergedRows.push(row.concat([label]));
+  });
+  chuaHocRows.forEach(function(row){ mergedRows.push(row.concat(['Chưa học'])); });
   
   var aoa = [
-    ['DANH SÁCH TỔNG HỢP CT/VT/ĐC/HỎNG'],
+    ['DANH SÁCH TỔNG HỢP CT/ĐC/HỎNG/CHƯA HỌC'],
     ['Chế độ', modeLabel],
     ['Số ' + (tkMode === 'bld' ? 'mã môn' : 'lớp') + ' đã chọn', selectedKeys.length],
     ['Mã lớp đã chọn', selectedClassText],
-    ['Tổng sinh viên CT/VT/DC/Hỏng', totalRows],
+    ['Tổng sinh viên', totalRows],
     ['Cấm thi', bannedRows.length],
-    ['Vắng thi', absentRows.length],
     ['Đình chỉ', suspendedRows.length],
-    ['Hỏng', failedRows.length],
+    ['Hỏng (Điểm <5 & VT)', failedRows.length],
+    ['Chưa học', chuaHocRows.length],
     [],
     [primaryLabel, 'Mã lớp', 'MSSV', 'Họ lót', 'Tên', 'Học phần chưa đạt', 'Ghi chú', 'Nhóm']
   ];
@@ -884,6 +971,7 @@ function exportTKBanList(){
   if(tkMode === 'bld'){
     appendResultListSheet(wb, bannedRows, 'DS_CamThi', 'DANH SÁCH CẤM THI');
     appendResultListSheet(wb, suspendedRows, 'DS_DinhChi', 'DANH SÁCH ĐÌNH CHỈ THI');
+    appendResultListSheet(wb, chuaHocRows, 'DS_ChuaHoc', 'DANH SÁCH CHƯA HỌC');
     appendResultListSheet(
       wb,
       (function(){
@@ -909,7 +997,11 @@ function exportTKBanList(){
         }
 
         absentRows.forEach(function(row){ addVtHongRow(row, 'VT'); });
-        failedRows.forEach(function(row){ addVtHongRow(row, 'Hỏng'); });
+        failedRows.forEach(function(row){
+          var rawStatus = String(row[6] || '').trim().toUpperCase();
+          var statusText = (rawStatus === 'VT') ? 'VT' : 'Hỏng';
+          addVtHongRow(row, statusText);
+        });
 
         return Object.keys(vtHongMap).map(function(key){
           var item = vtHongMap[key];
@@ -930,6 +1022,7 @@ function exportTKBanList(){
   } else {
     appendResultListSheet(wb, bannedRows, 'DS_CamThi', 'DANH SÁCH CẤM THI');
     appendResultListSheet(wb, suspendedRows, 'DS_DinhChi', 'DANH SÁCH ĐÌNH CHỈ THI');
+    appendResultListSheet(wb, chuaHocRows, 'DS_ChuaHoc', 'DANH SÁCH CHƯA HỌC');
   }
 
   var d = new Date();
@@ -959,7 +1052,7 @@ function exportTK(){
   }
 
   var pass = s.sx+s.g+s.kha+s.tb;
-  var fail = s.ct+s.vt+s.dc+s.hong;
+  var fail = s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
   var modeLabel = (tkMode === 'bld') ? 'BGD' : 'BLD';
 
   /* Lấy thông tin lọc để ghi vào header */
@@ -997,18 +1090,19 @@ function exportTK(){
     ['Vắng thi', s.vt,   'TL', pct(s.vt,s.total)+'%'],
     ['Đình chỉ', s.dc,   'TL', pct(s.dc,s.total)+'%'],
     ['Hỏng',     s.hong, 'TL', pct(s.hong,s.total)+'%'],
+    ['Chưa học', s.chua_hoc, 'TL', pct(s.chua_hoc,s.total)+'%'],
     [],
-    ['Lớp','Tổng','SX','G','Khá','TB','CT','VT','ĐC','Hỏng','TL đạt (%)']
+    ['Lớp','Tổng','SX','G','Khá','TB','CT','VT','ĐC','Hỏng','Chưa học','TL đạt (%)']
   ];
 
   [...tkSelected].sort().forEach(function(k){
     var c = classStats(k);
     var p = c.sx+c.g+c.kha+c.tb;
-    aoa.push([k, c.total, c.sx, c.g, c.kha, c.tb, c.ct, c.vt, c.dc, c.hong, pct(p,c.total)+'%']);
+    aoa.push([k, c.total, c.sx, c.g, c.kha, c.tb, c.ct, c.vt, c.dc, c.hong, c.chua_hoc, pct(p,c.total)+'%']);
   });
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:30},{wch:10},{wch:10},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
+  ws['!cols'] = [{wch:30},{wch:10},{wch:10},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
   XLSX.utils.book_append_sheet(wb, ws, 'ThongKe_' + modeLabel);
 
   /* Sheet chi tiết từng lớp */
@@ -1032,7 +1126,8 @@ function exportTK(){
       ['Cấm thi',  c.ct,   pct(c.ct,c.total)+'%'],
       ['Vắng thi', c.vt,   pct(c.vt,c.total)+'%'],
       ['Đình chỉ', c.dc,   pct(c.dc,c.total)+'%'],
-      ['Hỏng',     c.hong, pct(c.hong,c.total)+'%']
+      ['Hỏng',     c.hong, pct(c.hong,c.total)+'%'],
+      ['Chưa học',  c.chua_hoc, pct(c.chua_hoc,c.total)+'%']
     ];
     var wsC = XLSX.utils.aoa_to_sheet(aoaC);
     wsC['!cols'] = [{wch:24},{wch:10},{wch:12}];

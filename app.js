@@ -227,9 +227,39 @@ class GradeManager {
             this.subjects = [...new Set(this.gradeData.map((g) => g.MaMH).filter(Boolean))].sort();
             this.classes = this.collectClasses();
             this.mergeData();
+            // Regenerate KetQua/XepLoai for all merged rows to ensure correct categorization
+            this.regenerateResultColumns();
         } catch (e) {
             console.error('Error loading from storage:', e);
         }
+    }
+
+    regenerateResultColumns() {
+        this.mergedData.forEach((row) => {
+            const rawScore = row.DiemTB != null && String(row.DiemTB).trim() !== ''
+                ? row.DiemTB
+                : row.T1_DTK;
+            const specialScoreCode = this.getSpecialScoreCode(rawScore);
+            const numericScore = Number(String(rawScore == null ? '' : rawScore).replace(',', '.'));
+            const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
+            
+            row.XepLoai = specialScoreCode ? 'Không đạt' : this.getClassification(safeScore);
+            row.KetQua = specialScoreCode || this.getResult(safeScore);
+        });
+        
+        // Rebuild recordsBySubject with updated KetQua
+        this.recordsBySubject.clear();
+        this.mergedData.forEach((row) => {
+            if (row.MaMH) {
+                const normalizedCode = this.normalizeSubjectCode(row.MaMH);
+                if (!this.recordsBySubject.has(normalizedCode)) {
+                    this.recordsBySubject.set(normalizedCode, []);
+                }
+                this.recordsBySubject.get(normalizedCode).push(row);
+            }
+        });
+        
+        this.saveToStorage();
     }
 
     saveToStorage() {
@@ -529,7 +559,7 @@ class GradeManager {
             failed: 0,
             absent: 0,
             suspended: 0,
-            remedial: 0
+            notStudied: 0
         };
 
         rows.forEach((row) => {
@@ -547,7 +577,7 @@ class GradeManager {
             } else if (ketQua === 'Đình chỉ') {
                 stats.suspended++;
             } else if (diemNumeric === 0 || (!diemStr || Number.isNaN(diemNumeric))) {
-                stats.remedial++;
+                stats.notStudied++;
             } else if (diemNumeric > 0 && diemNumeric < 5.0) {
                 stats.failed++;
             } else {
@@ -1508,7 +1538,7 @@ class UIManager {
         aoa.push(rowPad(['', 'Vắng thi:', '', stats.absent.toString(), 'sinh viên/học sinh']));
         aoa.push(rowPad(['', 'Số sinh viên hỏng:', '', stats.failed.toString(), 'sinh viên/học sinh']));
         aoa.push(rowPad(['', 'Đình chỉ:', '', stats.suspended.toString(), 'sinh viên/học sinh']));
-        aoa.push(rowPad(['', 'Học lại:', '', stats.remedial.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Chưa học:', '', stats.notStudied.toString(), 'sinh viên/học sinh']));
 
         aoa.push(blankRow());
         aoa.push(rowPad(['Cán bộ ghi điểm', '', 'Phòng ĐT, QLSV', '', '', '', 'KT. GIÁM ĐỐC']));
@@ -1723,19 +1753,29 @@ class UIManager {
             
             // Add sheets for each category
             const categories = {
-                'CT': (row) => row.KetQua === 'CT',
-                'VT': (row) => row.KetQua === 'VT',
+                'CT': (row) => {
+                    const ketQua = String(row.KetQua || '').trim();
+                    // CHỈ CT - không lẫn VT
+                    return ketQua === 'CT';
+                },
+                'VT': (row) => {
+                    const ketQua = String(row.KetQua || '').trim();
+                    // CHỈ VT
+                    return ketQua === 'VT';
+                },
                 'Hong': (row) => {
                     const ketQua = String(row.KetQua || '').trim();
                     const diemTB = row.DiemTB;
                     const diemStr = String(diemTB || '').trim();
                     const diemNumeric = diemStr ? Number(diemStr.replace(',', '.')) : NaN;
-                    return ketQua === 'Hỏng' || (diemNumeric > 0 && diemNumeric < 5.0 && !Number.isNaN(diemNumeric));
+                    // Hỏng = KetQua là Hỏng hoặc điểm < 5.0 (nhưng > 0)
+                    return (ketQua === 'Hỏng') || (diemNumeric > 0 && diemNumeric < 5.0 && !Number.isNaN(diemNumeric));
                 },
-                'HocLai': (row) => {
+                'ChuaHoc': (row) => {
                     const diemTB = row.DiemTB;
                     const diemStr = String(diemTB || '').trim();
                     const diemNumeric = diemStr ? Number(diemStr.replace(',', '.')) : NaN;
+                    // Chưa học = không có điểm (0 hoặc empty/NaN)
                     return diemNumeric === 0 || (!diemStr || Number.isNaN(diemNumeric));
                 },
                 'DinhChi': (row) => row.KetQua === 'Đình chỉ'
@@ -2001,7 +2041,7 @@ class UIManager {
                 <span>Vắng thi: ${stats.absent}</span>
                 <span>Hỏng: ${stats.failed}</span>
                 <span>Đình chỉ: ${stats.suspended}</span>
-                <span>Học lại: ${stats.remedial}</span>
+                <span>Chưa học: ${stats.notStudied}</span>
             </div>
         `;
 

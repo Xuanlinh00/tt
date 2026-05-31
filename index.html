@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -257,6 +257,7 @@ body{font-family:"Arial",Helvetica,sans-serif;background:linear-gradient(160deg,
                 <div class="tk-line"><span>Vắng thi</span><span id="tkVT">0 (0%)</span></div>
                 <div class="tk-line"><span>Đình chỉ</span><span id="tkDC">0 (0%)</span></div>
                 <div class="tk-line"><span>Hỏng</span><span id="tkHong">0 (0%)</span></div>
+                <div class="tk-line"><span>Chưa học</span><span id="tkChuaHoc">0 (0%)</span></div>
               </div>
             </div>
 
@@ -274,11 +275,11 @@ body{font-family:"Arial",Helvetica,sans-serif;background:linear-gradient(160deg,
                 <thead>
                   <tr>
                     <th id="tkPrimaryColLabel">Lớp</th><th>Tổng</th><th>SX</th><th>G</th><th>Khá</th><th>TB</th>
-                    <th>CT</th><th>VT</th><th>DC</th><th>Hỏng</th><th>Tỷ lệ đạt</th>
+                    <th>CT</th><th>VT</th><th>DC</th><th>Hỏng</th><th>Chưa học</th><th>Tỷ lệ đạt</th>
                   </tr>
                 </thead>
                 <tbody id="tkClassTableBody">
-                  <tr><td class="l" colspan="11">Chưa có dữ liệu</td></tr>
+                  <tr><td class="l" colspan="12">Chưa có dữ liệu</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2269,14 +2270,39 @@ function renderTKClassList(){
 
 function isCode(s,h){ return s[h+'r']!=='' && s[h]===null; }
 function calcTB(s){ if(isCode(s,'hp1')||isCode(s,'hp2')||isCode(s,'hp3')||isCode(s,'hp4')) return null; if(s.hp1==null||s.hp2==null||s.hp3==null||s.hp4==null) return null; return Math.round((s.hp1*3+s.hp2*2+s.hp3+s.hp4*2)/8*100)/100; }
+function isHpEmptyOrZero(score, raw) {
+  if (score === null || score === undefined) return true;
+  if (score === 0) return true;
+  const r = String(raw || '').trim();
+  if (r === '' || r === '0') return true;
+  return false;
+}
 function category(s){
   const raw=[String(s.hp1r||'').toUpperCase(),String(s.hp2r||'').toUpperCase(),String(s.hp3r||'').toUpperCase(),String(s.hp4r||'').toUpperCase()];
-  if(raw.some(v=>v==='CT')) return 'ct';
-  if(raw.some(v=>v==='VT')) return 'vt';
+  
+  const allEmptyOrZero = isHpEmptyOrZero(s.hp1, s.hp1r) &&
+                         isHpEmptyOrZero(s.hp2, s.hp2r) &&
+                         isHpEmptyOrZero(s.hp3, s.hp3r) &&
+                         isHpEmptyOrZero(s.hp4, s.hp4r);
+  if(allEmptyOrZero) return 'chua_hoc';
+  
+  // Hỏng (VT hoặc điểm dưới 5) có mức ưu tiên cao nhất trong các lỗi
+  if(raw.some(v=>v==='VT')) return 'hong';
+  const scores = [Number(s.hp1), Number(s.hp2), Number(s.hp3), Number(s.hp4)];
+  for(let i = 0; i < scores.length; i++){
+    if(Number.isFinite(scores[i]) && scores[i] < 5) return 'hong';
+  }
+  
+  // Đình chỉ (DC)
   if(raw.some(v=>v==='DC'||v==='DINHCHI'||v==='ĐC')) return 'dc';
+  
+  // Cấm thi (CT)
+  if(raw.some(v=>v==='CT'||v==='CAMTHI')) return 'ct';
+  
   const tb=calcTB(s);
   if(s.hp1==null||s.hp2==null||s.hp3==null||s.hp4==null) return 'hong';
-  if(s.hp1<5||s.hp2<5||s.hp3<5||s.hp4<5||tb===null) return 'hong';
+  if(tb===null) return 'hong';
+  
   if(tb>=8.95) return 'sx';
   if(tb>=7.95) return 'g';
   if(tb>=6.95) return 'kha';
@@ -2285,13 +2311,13 @@ function category(s){
 }
 
 function classStats(k){
-  const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
+  const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,chua_hoc:0,total:0};
   const grp=tkByLop[k]; if(!grp) return out;
   (grp.students||[]).forEach(s=>{ const c=category(s); out[c]++; out.total++; });
   return out;
 }
 function statsFromSelection(){
-  const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,total:0};
+  const out={sx:0,g:0,kha:0,tb:0,ct:0,vt:0,dc:0,hong:0,chua_hoc:0,total:0};
   [...tkSelected].forEach(k=>{ const c=classStats(k); Object.keys(out).forEach(key=>{ out[key]+=c[key]||0; });});
   return out;
 }
@@ -2299,10 +2325,10 @@ function pct(n,total){ return total?((n*100)/total).toFixed(2):'0.00'; }
 
 function renderClassStatsTable(){
   const keys=[...tkSelected].sort();
-  if(!keys.length){ tkClassTableBody.innerHTML='<tr><td class="l" colspan="11">Chưa chọn lớp nào</td></tr>'; return; }
+  if(!keys.length){ tkClassTableBody.innerHTML='<tr><td class="l" colspan="12">Chưa chọn lớp nào</td></tr>'; return; }
   tkClassTableBody.innerHTML = keys.map(k=>{
     const s=classStats(k); const pass=s.sx+s.g+s.kha+s.tb;
-    return `<tr><td class="l">${k}</td><td>${s.total}</td><td>${s.sx}</td><td>${s.g}</td><td>${s.kha}</td><td>${s.tb}</td><td>${s.ct}</td><td>${s.vt}</td><td>${s.dc}</td><td>${s.hong}</td><td>${pct(pass,s.total)}%</td></tr>`;
+    return `<tr><td class="l">${k}</td><td>${s.total}</td><td>${s.sx}</td><td>${s.g}</td><td>${s.kha}</td><td>${s.tb}</td><td>${s.ct}</td><td>${s.vt}</td><td>${s.dc}</td><td>${s.hong}</td><td>${s.chua_hoc}</td><td>${pct(pass,s.total)}%</td></tr>`;
   }).join('');
 }
 
@@ -2315,19 +2341,20 @@ function renderClassCards(){
   tkClassCards.innerHTML = keys.map(k=>{
     const s=classStats(k);
     const pass=s.sx+s.g+s.kha+s.tb;
+    const fail=s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
     return `<div class="tk-class-card">
       <h6>${k}</h6>
       <div class="r"><span>Tổng SV</span><span>${s.total}</span></div>
       <div class="r"><span>Đạt</span><span>${pass} (${pct(pass,s.total)}%)</span></div>
-      <div class="r"><span>Không đạt</span><span>${s.total-pass} (${pct(s.total-pass,s.total)}%)</span></div>
+      <div class="r"><span>Không đạt</span><span>${fail} (${pct(fail,s.total)}%)</span></div>
       <div class="r"><span>SX/G/Khá/TB</span><span>${s.sx}/${s.g}/${s.kha}/${s.tb}</span></div>
-      <div class="r"><span>CT/VT/DC/Hỏng</span><span>${s.ct}/${s.vt}/${s.dc}/${s.hong}</span></div>
+      <div class="r"><span>CT/VT/DC/Hỏng/Chưa học</span><span>${s.ct}/${s.vt}/${s.dc}/${s.hong}/${s.chua_hoc}</span></div>
     </div>`;
   }).join('');
 }
 
 function updateTKSummary(){
-  const s=statsFromSelection(); const pass=s.sx+s.g+s.kha+s.tb; const fail=s.ct+s.vt+s.dc+s.hong;
+  const s=statsFromSelection(); const pass=s.sx+s.g+s.kha+s.tb; const fail=s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
   document.getElementById('kpiTotal').textContent=s.total;
   document.getElementById('kpiClass').textContent=tkSelected.size;
   document.getElementById('kpiPass').textContent=`${pct(pass,s.total)}%`;
@@ -2340,6 +2367,7 @@ function updateTKSummary(){
   document.getElementById('tkVT').textContent=`${s.vt} (${pct(s.vt,s.total)}%)`;
   document.getElementById('tkDC').textContent=`${s.dc} (${pct(s.dc,s.total)}%)`;
   document.getElementById('tkHong').textContent=`${s.hong} (${pct(s.hong,s.total)}%)`;
+  document.getElementById('tkChuaHoc').textContent=`${s.chua_hoc} (${pct(s.chua_hoc,s.total)}%)`;
   renderClassCards();
   renderClassStatsTable();
 }
@@ -2349,15 +2377,16 @@ function exportTK(){
   if(!s.total){ setStatus('Chưa có dữ liệu thống kê để xuất', 'warn'); return; }
   const wb=XLSX.utils.book_new();
   const pass=s.sx+s.g+s.kha+s.tb;
+  const fail=s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
   const aoa=[
-    ['THONG KE KET QUA GDQP'],['Tong SV', s.total],['Ty le dat', pct(pass,s.total)+'%'],['Ty le khong dat', pct(s.total-pass,s.total)+'%'],[],
+    ['THONG KE KET QUA GDQP'],['Tong SV', s.total],['Ty le dat', pct(pass,s.total)+'%'],['Ty le khong dat', pct(fail,s.total)+'%'],[],
     ['Dat'],['Xuat sac', s.sx, 'TL', pct(s.sx,s.total)+'%'],['Gioi', s.g, 'TL', pct(s.g,s.total)+'%'],['Kha', s.kha, 'TL', pct(s.kha,s.total)+'%'],['Trung binh', s.tb, 'TL', pct(s.tb,s.total)+'%'],[],
-    ['Khong dat'],['Cam thi', s.ct, 'TL', pct(s.ct,s.total)+'%'],['Vang thi', s.vt, 'TL', pct(s.vt,s.total)+'%'],['Dinh chi', s.dc, 'TL', pct(s.dc,s.total)+'%'],['Hong', s.hong, 'TL', pct(s.hong,s.total)+'%'],[],
-    ['Theo tung lop da chon'],['Lop','Tong','SX','G','Kha','TB','CT','VT','DC','Hong','Ty le dat']
+    ['Khong dat'],['Cam thi', s.ct, 'TL', pct(s.ct,s.total)+'%'],['Vang thi', s.vt, 'TL', pct(s.vt,s.total)+'%'],['Dinh chi', s.dc, 'TL', pct(s.dc,s.total)+'%'],['Hong', s.hong, 'TL', pct(s.hong,s.total)+'%'],['Chua hoc', s.chua_hoc, 'TL', pct(s.chua_hoc,s.total)+'%'],[],
+    ['Theo tung lop da chon'],['Lop','Tong','SX','G','Kha','TB','CT','VT','DC','Hong','Chua hoc','Ty le dat']
   ];
-  [...tkSelected].sort().forEach(k=>{ const c=classStats(k); const p=c.sx+c.g+c.kha+c.tb; aoa.push([k,c.total,c.sx,c.g,c.kha,c.tb,c.ct,c.vt,c.dc,c.hong,pct(p,c.total)+'%']); });
+  [...tkSelected].sort().forEach(k=>{ const c=classStats(k); const p=c.sx+c.g+c.kha+c.tb; aoa.push([k,c.total,c.sx,c.g,c.kha,c.tb,c.ct,c.vt,c.dc,c.hong,c.chua_hoc,pct(p,c.total)+'%']); });
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:30},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:15}];
+  ws['!cols']=[{wch:30},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:15}];
   XLSX.utils.book_append_sheet(wb, ws, 'ThongKe');
 
   [...tkSelected].sort().forEach(k=>{
@@ -2380,6 +2409,7 @@ function exportTK(){
       ['Vang thi', c.vt],
       ['Dinh chi', c.dc],
       ['Hong', c.hong],
+      ['Chua hoc', c.chua_hoc]
     ];
     const wsClass = XLSX.utils.aoa_to_sheet(aoaClass);
     wsClass['!cols']=[{wch:30},{wch:20}];
@@ -2393,7 +2423,7 @@ function exportTK(){
 }
 
 </script>
-<script src="thongke.js"></script>
+<script src="thongke.js?v=3"></script>
 <script>
 // Initialize after thongke.js is loaded to ensure applyTKFilters and other functions are available
 function initializeOnPageLoad(){
