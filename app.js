@@ -521,6 +521,43 @@ class GradeManager {
         return Number.isFinite(score) && score >= 5 ? 'Đạt' : 'Hỏng';
     }
 
+    calculateStatistics(rows) {
+        const stats = {
+            total: rows.length,
+            passed: 0,
+            banned: 0,
+            failed: 0,
+            absent: 0,
+            suspended: 0,
+            remedial: 0
+        };
+
+        rows.forEach((row) => {
+            const ketQua = String(row.KetQua || '').trim();
+            const diemTB = row.DiemTB;
+            const diemStr = String(diemTB || '').trim();
+            const diemNumeric = diemStr ? Number(diemStr.replace(',', '.')) : NaN;
+            
+            if (ketQua === 'Đạt') {
+                stats.passed++;
+            } else if (ketQua === 'CT' || ketQua === 'CD') {
+                stats.banned++;
+            } else if (ketQua === 'VT') {
+                stats.absent++;
+            } else if (ketQua === 'Đình chỉ') {
+                stats.suspended++;
+            } else if (diemNumeric === 0 || (!diemStr || Number.isNaN(diemNumeric))) {
+                stats.remedial++;
+            } else if (diemNumeric > 0 && diemNumeric < 5.0) {
+                stats.failed++;
+            } else {
+                stats.failed++;
+            }
+        });
+
+        return stats;
+    }
+
     getScoreSheetData(subjectCode, classCode) {
         const normalizedSubjectCode = this.normalizeSubjectCode(subjectCode);
         const gradeRows = normalizedSubjectCode
@@ -557,7 +594,7 @@ class GradeManager {
                 NgaySinhC: gradeRow.NgaySinhC || student.NgaySinhC || '',
                 DiemTB: scoreForDisplay,
                 XepLoai: specialScoreCode ? 'Không đạt' : this.getClassification(safeScore),
-                KetQua: specialScoreCode ? 'Hỏng' : this.getResult(safeScore),
+                KetQua: specialScoreCode || this.getResult(safeScore),
                 _scoreRank: scoreRankValue,
                 MaLop: gradeRow.MaLop || student.MaLop || '',
                 MaMH: this.normalizeSubjectCode(gradeRow.MaMH || normalizedSubjectCode || ''),
@@ -1463,9 +1500,15 @@ class UIManager {
         });
 
         aoa.push(rowPad(['Ghi chú: "CT" - Cấm thi.']));
-        aoa.push(rowPad(['', 'Tổng số SV trên danh sách:', '', report.total.toString(), 'sinh viên/học sinh']));
-        aoa.push(rowPad(['', 'Số sinh viên đạt:', '', report.passed.toString(), 'sinh viên/học sinh']));
-        aoa.push(rowPad(['', 'Số sinh viên hỏng:', '', report.failed.toString(), 'sinh viên/học sinh']));
+        
+        const stats = this.manager.calculateStatistics(report.rows);
+        aoa.push(rowPad(['', 'Tổng số SV trên danh sách:', '', stats.total.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Số sinh viên đạt:', '', stats.passed.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Cấm thi:', '', stats.banned.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Vắng thi:', '', stats.absent.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Số sinh viên hỏng:', '', stats.failed.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Đình chỉ:', '', stats.suspended.toString(), 'sinh viên/học sinh']));
+        aoa.push(rowPad(['', 'Học lại:', '', stats.remedial.toString(), 'sinh viên/học sinh']));
 
         aoa.push(blankRow());
         aoa.push(rowPad(['Cán bộ ghi điểm', '', 'Phòng ĐT, QLSV', '', '', '', 'KT. GIÁM ĐỐC']));
@@ -1677,6 +1720,41 @@ class UIManager {
             });
 
             const fileName = this.sanitizeFileName(`Bang_diem_${report.subjectCode || 'MonHoc'}_TongHop_va_theo_lop.xlsx`);
+            
+            // Add sheets for each category
+            const categories = {
+                'CT': (row) => row.KetQua === 'CT',
+                'VT': (row) => row.KetQua === 'VT',
+                'Hong': (row) => {
+                    const ketQua = String(row.KetQua || '').trim();
+                    const diemTB = row.DiemTB;
+                    const diemStr = String(diemTB || '').trim();
+                    const diemNumeric = diemStr ? Number(diemStr.replace(',', '.')) : NaN;
+                    return ketQua === 'Hỏng' || (diemNumeric > 0 && diemNumeric < 5.0 && !Number.isNaN(diemNumeric));
+                },
+                'HocLai': (row) => {
+                    const diemTB = row.DiemTB;
+                    const diemStr = String(diemTB || '').trim();
+                    const diemNumeric = diemStr ? Number(diemStr.replace(',', '.')) : NaN;
+                    return diemNumeric === 0 || (!diemStr || Number.isNaN(diemNumeric));
+                },
+                'DinhChi': (row) => row.KetQua === 'Đình chỉ'
+            };
+            
+            Object.entries(categories).forEach(([categoryName, filterFn]) => {
+                const categoryRows = report.rows.filter(filterFn);
+                if (categoryRows.length === 0) return;
+                
+                const categoryReport = this.buildReportFromRows(report, categoryRows, '');
+                const categoryAoa = this.buildScoreSheetAOA(categoryReport, {
+                    includeClassColumn,
+                    groupLabelOverride: categoryName
+                });
+                const categoryWs = XLSX.utils.aoa_to_sheet(categoryAoa);
+                this.styleScoreSheetWorksheet(categoryWs, categoryRows.length, includeClassColumn);
+                XLSX.utils.book_append_sheet(workbook, categoryWs, makeUniqueSheetName(categoryName));
+            });
+            
             XLSX.writeFile(workbook, fileName);
             this.showStatus('✓ Đã xuất file Excel thành công', 'success', 'gradeStatus');
         } catch (error) {
@@ -1913,9 +1991,17 @@ class UIManager {
                 </tbody>
             </table>
             <div class="report-summary">
-                <span>Tổng số SV: ${report.total}</span>
-                <span>Số SV đạt: ${report.passed}</span>
-                <span>Số SV hỏng: ${report.failed}</span>
+        `;
+
+        const stats = this.manager.calculateStatistics(report.rows);
+        html += `
+                <span>Tổng số SV: ${stats.total}</span>
+                <span>Số SV đạt: ${stats.passed}</span>
+                <span>Cấm thi: ${stats.banned}</span>
+                <span>Vắng thi: ${stats.absent}</span>
+                <span>Hỏng: ${stats.failed}</span>
+                <span>Đình chỉ: ${stats.suspended}</span>
+                <span>Học lại: ${stats.remedial}</span>
             </div>
         `;
 
