@@ -1071,10 +1071,10 @@ function drawQDTable(){
       </div>
       <div class="qd-date">${xdate}</div>
 
-      <div style="text-align:center;border:2px solid #008000;padding:8px;margin-bottom:8px">
-        <div style="font-weight:bold;text-decoration:underline;padding-bottom:4px">ĐẠI HỌC TRÀ VINH</div>
-        <div style="font-weight:bold;text-decoration:underline;padding-bottom:4px">TRUNG TÂM GIÁO DỤC QUỐC PHÒNG</div>
-        <div style="font-weight:bold;text-decoration:underline">VÀ AN NINH ĐẠI HỌC TRÀ VINH</div>
+      <div class="qd-title">
+        <div>ĐẠI HỌC TRÀ VINH</div>
+        <div>TRUNG TÂM GIÁO DỤC QUỐC PHÒNG</div>
+        <div>VÀ AN NINH ĐẠI HỌC TRÀ VINH</div>
       </div>
       <div class="qd-sub">${buildDecisionIssueText()}</div>
 
@@ -1107,7 +1107,7 @@ function drawQDTable(){
 function hpVal(s, h){
   const r = s[h+'r'];
   if(r === '') return '';
-  if(s[h] !== null) return s[h];
+  if(s[h] !== null) return (typeof s[h] === 'number' ? s[h].toFixed(1) : String(s[h]));
   return r;
 }
 
@@ -1259,7 +1259,11 @@ function exportExcel(scope='all'){
       font: { name: 'Arial', sz: 12 },
       alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
     });
-    applyRangeStyle(ws, 1, 2, 0, 4, {
+    applyRangeStyle(ws, 1, 1, 0, 4, {
+      font: { name: 'Arial', sz: 12, bold: true },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+    });
+    applyRangeStyle(ws, 2, 2, 0, 4, {
       font: { name: 'Arial', sz: 12, bold: true, underline: true },
       alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
     });
@@ -1444,7 +1448,11 @@ function exportQuyetDinh(scope='all'){
     font: { name: 'Arial', sz: 12 },
     alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
   });
-  applyRangeStyle(ws, 1, 2, 0, 4, {
+  applyRangeStyle(ws, 1, 1, 0, 4, {
+    font: { name: 'Arial', sz: 12, bold: true },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+  });
+  applyRangeStyle(ws, 2, 2, 0, 4, {
     font: { name: 'Arial', sz: 12, bold: true, underline: true },
     alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
   });

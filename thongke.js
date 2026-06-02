@@ -179,11 +179,14 @@ function buildBLDDataByClass(rows){
 ───────────────────────────────────────────────────────────── */
 function buildBGDDataByClass(rows){
   var byClass = {};
+  var totalRows = 0, keptRows = 0;
   rows.forEach(function(r){
+    totalRows++;
     if(!tkCols) return;
     var maMH = tkCols.maMH && r[tkCols.maMH]!=null
       ? normalizeSubjectCode(r[tkCols.maMH]) : '';
     if(!BGD_SUBJECTS[maMH]) return;
+    keptRows++;
 
     var maSV = tkCols.maSV && r[tkCols.maSV]!=null
       ? String(r[tkCols.maSV]).trim() : '';
@@ -212,6 +215,7 @@ function buildBGDDataByClass(rows){
   Object.keys(byClass).forEach(function(lop){
     byClass[lop].students = Object.values(byClass[lop].students);
   });
+  try{ console.log('buildBGDDataByClass: totalRows=', totalRows, 'keptRows=', keptRows, 'classes=', Object.keys(byClass).length); }catch(e){}
   return byClass;
 }
 
@@ -251,8 +255,8 @@ function categoryBLD(s){
                        isHpEmptyOrZero(s.hp4, s.hp4r);
   if(allEmptyOrZero) return 'chua_hoc';
   
-  // Hỏng (VT hoặc điểm dưới 5) có mức ưu tiên cao nhất trong các lỗi
-  if(codes.indexOf('VT') >= 0) return 'hong';
+  // Vắng thi (VT) — thống kê riêng
+  if(codes.indexOf('VT') >= 0) return 'vt';
   if(hasAnyBLDScoreBelow5(s)) return 'hong';
   
   // Đình chỉ (DC)
@@ -278,7 +282,7 @@ function categoryBGD(s){
   var code = normalizeTKResultCode(s.raw);
   if(code==='CT') return 'ct';
   if(code==='DC') return 'dc';
-  if(code==='VT') return 'hong';
+  if(code==='VT') return 'vt';
   
   var rawStr = String(s.raw || '').trim();
   var isZeroOrEmpty = (s.score === null || s.score === undefined || s.score === 0 || rawStr === '' || rawStr === '0');
@@ -816,10 +820,19 @@ function collectStudentsByResultCode(targetCode){
   var wanted = String(targetCode || '').trim().toLowerCase();
   if(!wanted) return rows;
 
+  try{ console.log('collectStudentsByResultCode start:', wanted, 'tkMode=', tkMode, 'tkSelectedSize=', Array.isArray(tkSelected)?tkSelected.length:tkSelected.size); }catch(e){}
+
   if(tkMode === 'bgd'){
+    var logCount = 0;
     [...tkSelected].sort().forEach(function(key){
       var group = tkByLop[key];
       if(!group || !Array.isArray(group.students)) return;
+      try{
+        if(logCount < 8){
+          console.log('collectStudentsByResultCode bgd key:', key, 'students.length=', group.students.length, 'sample=', JSON.stringify(group.students[0] || {}));
+          logCount++;
+        }
+      }catch(e){}
       group.students.forEach(function(s){
         if(categoryBGD(s) !== wanted) return;
         var maSV = s.maSV || '';
@@ -850,10 +863,10 @@ function collectStudentsByResultCode(targetCode){
             subCate = 'ct';
           } else if(rawCode === 'DC') {
             subCate = 'dc';
+          } else if(rawCode === 'VT') {
+            subCate = 'vt';
           } else if(isHpEmptyOrZero(s[item.hp], s[item.hp + 'r'])) {
             subCate = 'chua_hoc';
-          } else if(rawCode === 'VT') {
-            subCate = 'hong';
           } else {
             var score = Number(s[item.hp]);
             if(Number.isFinite(score) && score < 5) {
@@ -909,69 +922,124 @@ function exportTKBanList(){
     if(typeof setStatus === 'function') setStatus('Thư viện XLSX chưa tải.', 'warn');
     return;
   }
-  
+  ensureTKGlobals();
+
+  // If no data loaded, bail out with clear message instead of calling applyTKFilters
+  if(!tkCols || !Array.isArray(tkRawRows) || !tkRawRows.length){
+    if(typeof setStatus === 'function') setStatus('Chưa có dữ liệu. Vui lòng tải file đầy đủ rồi nhấn "Tiến hành thống kê" trước khi xuất.', 'warn');
+    try{ console.log('exportTKBanList aborted: no tkCols or tkRawRows'); }catch(e){}
+    return;
+  }
+
+  // Rebuild datasets/selection first to ensure tkByLop / tkSelected are populated
+  try{ applyTKFilters(); }catch(e){}
+
+  // Diagnostic info
+  try{ console.log('exportTKBanList debug: tkMode=', tkMode, 'tkCols=', !!tkCols, 'tkRawRows.length=', Array.isArray(tkRawRows)?tkRawRows.length:0, 'tkAllClasses.length=', tkAllClasses.length, 'tkSelected.size=', tkSelected.size, 'filterMode=', getTKFilterMode()); }catch(e){}
+
   var selectedKeys = [...tkSelected];
   if(!selectedKeys.length){
     if(typeof setStatus === 'function') setStatus('Chưa chọn lớp/mã môn để xuất danh sách CT/VT/DC/Hỏng', 'warn');
     return;
   }
 
+  // Dump a small sample of tkByLop to help debug
+  try{
+    var sampleKeys = tkAllClasses.slice(0,6);
+    var sampleDump = {};
+    sampleKeys.forEach(function(k){ sampleDump[k] = (tkByLop[k] && tkByLop[k].students) ? tkByLop[k].students.length : 0; });
+    console.log('exportTKBanList tkByLop sample counts:', JSON.stringify(sampleDump));
+  }catch(e){}
+
   var bannedRows = collectStudentsByResultCode('ct');
-  var absentRows = collectStudentsByResultCode('vt'); // will be empty
+  var absentRows = collectStudentsByResultCode('vt');
   var suspendedRows = collectStudentsByResultCode('dc');
   var failedRows = collectStudentsByResultCode('hong');
   var chuaHocRows = collectStudentsByResultCode('chua_hoc');
-  var totalRows = bannedRows.length + absentRows.length + suspendedRows.length + failedRows.length + chuaHocRows.length;
 
+  // Debug logging: counts for each category (stringified for easier copy)
+  try{
+    var countsDebug = { mode: tkMode, tkSelected: [...tkSelected].slice(0,20), tkSelectedSize: tkSelected.size, tkAllClassesSize: tkAllClasses.length, banned: bannedRows.length, absent: absentRows.length, suspended: suspendedRows.length, failed: failedRows.length, chuaHoc: chuaHocRows.length };
+    console.log('exportTKBanList counts:', JSON.stringify(countsDebug));
+    console.log('exportTKBanList sample rows:', {banned: bannedRows.slice(0,3), absent: absentRows.slice(0,3), suspended: suspendedRows.slice(0,3), failed: failedRows.slice(0,3), chuaHoc: chuaHocRows.slice(0,3)});
+  }catch(e){}
+
+  // Aggregate all problem rows per student so 1 sinh viên = 1 dòng
+  var agg = {};
+  function addToAgg(row, statusLabel){
+    var key = [row[0]||'', row[1]||'', row[2]||''].join('|');
+    if(!agg[key]) agg[key] = {primary: row[0]||'', maLop: row[1]||'', maSV: row[2]||'', hoLot: row[3]||'', ten: row[4]||'', subjects: [], statuses: []};
+    var it = agg[key];
+    var subj = String(row[5]||'').trim(); if(subj && it.subjects.indexOf(subj) < 0) it.subjects.push(subj);
+    if(statusLabel && it.statuses.indexOf(statusLabel) < 0) it.statuses.push(statusLabel);
+  }
+
+  bannedRows.forEach(function(r){ addToAgg(r, 'CT'); });
+  suspendedRows.forEach(function(r){ addToAgg(r, 'DC'); });
+  chuaHocRows.forEach(function(r){ addToAgg(r, 'Chưa học'); });
+  absentRows.forEach(function(r){ addToAgg(r, 'VT'); });
+  failedRows.forEach(function(r){ var raw = String(r[6]||'').trim().toUpperCase(); addToAgg(r, raw === 'VT' ? 'VT' : 'Hỏng'); });
+
+  var mergedRows = Object.keys(agg).map(function(k){
+    var it = agg[k];
+    return [it.primary, it.maLop, it.maSV, it.hoLot, it.ten, it.subjects.join(', '), it.statuses.join(' / ')];
+  });
+
+  var totalRows = mergedRows.length;
+  try{ console.log('exportTKBanList mergedRows length:', totalRows, 'sample:', mergedRows.slice(0,6)); }catch(e){}
   if(!totalRows){
     if(typeof setStatus === 'function') setStatus('Không có sinh viên CT/VT/DC/Hỏng/Chưa học trong lựa chọn hiện tại', 'warn');
     return;
   }
 
+  // count VT+Hỏng entries in aggregated map
+  var vtHongCount = Object.keys(agg).reduce(function(cnt,k){
+    var s = agg[k].statuses || [];
+    return cnt + ((s.indexOf('VT')>=0 || s.indexOf('Hỏng')>=0) ? 1 : 0);
+  }, 0);
+
   var wb = XLSX.utils.book_new();
   var primaryLabel = getTKPrimaryLabel();
   var modeLabel = tkMode === 'bld' ? 'BGD' : 'BLD';
-  var selectedClassText = selectedKeys.length === 1
-    ? selectedKeys[0]
-    : selectedKeys.join(', ');
-  var mergedRows = [];
+  var selectedClassText = selectedKeys.length === 1 ? selectedKeys[0] : selectedKeys.join(', ');
 
-  bannedRows.forEach(function(row){ mergedRows.push(row.concat(['CT'])); });
-  absentRows.forEach(function(row){ mergedRows.push(row.concat(['VT'])); });
-  suspendedRows.forEach(function(row){ mergedRows.push(row.concat(['DC'])); });
-  failedRows.forEach(function(row){
-    var rawStatus = String(row[6] || '').trim().toUpperCase();
-    var label = (rawStatus === 'VT') ? 'VT' : 'Hỏng';
-    mergedRows.push(row.concat([label]));
-  });
-  chuaHocRows.forEach(function(row){ mergedRows.push(row.concat(['Chưa học'])); });
-  
   var aoa = [
     ['DANH SÁCH TỔNG HỢP CT/ĐC/HỎNG/CHƯA HỌC'],
     ['Chế độ', modeLabel],
     ['Số ' + (tkMode === 'bld' ? 'mã môn' : 'lớp') + ' đã chọn', selectedKeys.length],
     ['Mã lớp đã chọn', selectedClassText],
-    ['Tổng sinh viên', totalRows],
-    ['Cấm thi', bannedRows.length],
-    ['Đình chỉ', suspendedRows.length],
-    ['Hỏng (Điểm <5 & VT)', failedRows.length],
+    ['Tổng dòng (hàng)', totalRows],
+    ['Cấm thi (CT)', bannedRows.length],
+    ['Đình chỉ (DC)', suspendedRows.length],
+    ['VT + Hỏng (gộp theo SV)', vtHongCount],
     ['Chưa học', chuaHocRows.length],
     [],
     [primaryLabel, 'Mã lớp', 'MSSV', 'Họ lót', 'Tên', 'Học phần chưa đạt', 'Ghi chú', 'Nhóm']
   ];
 
-  mergedRows.forEach(function(row){
-    aoa.push(row);
-  });
+  mergedRows.forEach(function(row){ aoa.push(row); });
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{wch:18},{wch:18},{wch:16},{wch:24},{wch:16},{wch:30},{wch:20},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws, 'TongHop');
 
   if(tkMode === 'bld'){
-    appendResultListSheet(wb, bannedRows, 'DS_CamThi', 'DANH SÁCH CẤM THI');
+    // aggregate CT and Chưa học per student like VT+Hỏng
+    function aggregatePerStudent(rows){
+      var map = {};
+      rows.forEach(function(row){
+        var key = [row[0]||'', row[1]||'', row[2]||''].join('|');
+        if(!map[key]) map[key] = {primary: row[0]||'', maLop: row[1]||'', maSV: row[2]||'', hoLot: row[3]||'', ten: row[4]||'', subjects: [], statuses: []};
+        var it = map[key];
+        var subj = String(row[5]||'').trim(); if(subj && it.subjects.indexOf(subj) < 0) it.subjects.push(subj);
+        var st = String(row[6]||'').trim(); if(st && it.statuses.indexOf(st) < 0) it.statuses.push(st);
+      });
+      return Object.keys(map).map(function(k){ var it = map[k]; return [it.primary, it.maLop, it.maSV, it.hoLot, it.ten, it.subjects.join(', '), it.statuses.join(' / ')]; });
+    }
+
+    appendResultListSheet(wb, aggregatePerStudent(bannedRows), 'DS_CamThi', 'DANH SÁCH CẤM THI');
     appendResultListSheet(wb, suspendedRows, 'DS_DinhChi', 'DANH SÁCH ĐÌNH CHỈ THI');
-    appendResultListSheet(wb, chuaHocRows, 'DS_ChuaHoc', 'DANH SÁCH CHƯA HỌC');
+    appendResultListSheet(wb, aggregatePerStudent(chuaHocRows), 'DS_ChuaHoc', 'DANH SÁCH CHƯA HỌC');
     appendResultListSheet(
       wb,
       (function(){
@@ -1020,9 +1088,22 @@ function exportTKBanList(){
       'DANH SÁCH VẮNG THI + HỎNG'
     );
   } else {
-    appendResultListSheet(wb, bannedRows, 'DS_CamThi', 'DANH SÁCH CẤM THI');
+    // For BGD mode, also aggregate CT and Chưa học per student
+    function aggregatePerStudentBGD(rows){
+      var map = {};
+      rows.forEach(function(row){
+        var key = [row[0]||'', row[1]||'', row[2]||''].join('|');
+        if(!map[key]) map[key] = {primary: row[0]||'', maLop: row[1]||'', maSV: row[2]||'', hoLot: row[3]||'', ten: row[4]||'', subjects: [], statuses: []};
+        var it = map[key];
+        var subj = String(row[5]||'').trim(); if(subj && it.subjects.indexOf(subj) < 0) it.subjects.push(subj);
+        var st = String(row[6]||'').trim(); if(st && it.statuses.indexOf(st) < 0) it.statuses.push(st);
+      });
+      return Object.keys(map).map(function(k){ var it = map[k]; return [it.primary, it.maLop, it.maSV, it.hoLot, it.ten, it.subjects.join(', '), it.statuses.join(' / ')]; });
+    }
+
+    appendResultListSheet(wb, aggregatePerStudentBGD(bannedRows), 'DS_CamThi', 'DANH SÁCH CẤM THI');
     appendResultListSheet(wb, suspendedRows, 'DS_DinhChi', 'DANH SÁCH ĐÌNH CHỈ THI');
-    appendResultListSheet(wb, chuaHocRows, 'DS_ChuaHoc', 'DANH SÁCH CHƯA HỌC');
+    appendResultListSheet(wb, aggregatePerStudentBGD(chuaHocRows), 'DS_ChuaHoc', 'DANH SÁCH CHƯA HỌC');
   }
 
   var d = new Date();
@@ -1104,6 +1185,39 @@ function exportTK(){
   var ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{wch:30},{wch:10},{wch:10},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
   XLSX.utils.book_append_sheet(wb, ws, 'ThongKe_' + modeLabel);
+
+  /* Sheet VT + Hỏng (chi tiết theo sinh viên) */
+  (function(){
+    var bannedRows = collectStudentsByResultCode('ct');
+    var absentRows = collectStudentsByResultCode('vt');
+    var suspendedRows = collectStudentsByResultCode('dc');
+    var failedRows = collectStudentsByResultCode('hong');
+
+    var vtHongMap = {};
+    function addRowToMap(row, statusText){
+      var key = [row[0]||'', row[1]||'', row[2]||''].join('|');
+      if(!vtHongMap[key]) vtHongMap[key] = {primary: row[0]||'', maLop: row[1]||'', maSV: row[2]||'', hoLot: row[3]||'', ten: row[4]||'', subjects: [], statuses: []};
+      var item = vtHongMap[key];
+      var subj = String(row[5]||'').trim(); if(subj && item.subjects.indexOf(subj) < 0) item.subjects.push(subj);
+      if(statusText && item.statuses.indexOf(statusText) < 0) item.statuses.push(statusText);
+    }
+
+    absentRows.forEach(function(r){ addRowToMap(r, 'VT'); });
+    failedRows.forEach(function(r){ var raw = String(r[6]||'').trim().toUpperCase(); addRowToMap(r, raw === 'VT' ? 'VT' : 'Hỏng'); });
+
+    var aoaVT = [];
+    aoaVT.push(['DS VẮNG THI + HỎNG (Chi tiết)']);
+    aoaVT.push(['Tổng dòng', Object.keys(vtHongMap).length]);
+    aoaVT.push([]);
+    aoaVT.push(['Lớp','Mã lớp','MSSV','Họ lót','Tên','Học phần/Tình trạng','Tình trạng tổng']);
+    Object.keys(vtHongMap).forEach(function(k){
+      var it = vtHongMap[k];
+      aoaVT.push([it.primary, it.maLop, it.maSV, it.hoLot, it.ten, it.subjects.join(', '), it.statuses.join(' / ')]);
+    });
+    var ws2 = XLSX.utils.aoa_to_sheet(aoaVT);
+    ws2['!cols'] = [{wch:18},{wch:12},{wch:12},{wch:20},{wch:12},{wch:30},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'DS_VT_Hong');
+  })();
 
   /* Sheet chi tiết từng lớp */
   [...tkSelected].sort().forEach(function(k){
