@@ -13,7 +13,7 @@ var BLD_HP_MAP = {
   /* Dạng ngắn (190081...) */
   '190081':1, '190082':2, '190083':3, '190084':4,
   /* Dạng dài (1900081...) như đặc tả */
-  '1900081':1, '1900082':2, '1900083':3, '190004':4
+  '1900081':1, '1900082':2, '1900083':3, '1900084':4
 };
 var BLD_SUBJECTS = (function(){
   var s = {}; Object.keys(BLD_HP_MAP).forEach(function(k){ s[k]=true; }); return s;
@@ -239,35 +239,45 @@ function hasAnyBLDScoreBelow5(s){
 }
 
 function isHpEmptyOrZero(score, raw) {
-  if (score === null || score === undefined) return true;
-  if (score === 0) return true;
-  var r = String(raw || '').trim();
-  if (r === '' || r === '0') return true;
+  // Return true only when there is no score and no raw marker —
+  // don't treat numeric 0 as empty (0 = likely VT).
+  if (score === null || score === undefined) {
+    var r = String(raw || '').trim();
+    return (r === '');
+  }
   return false;
 }
 
 function categoryBLD(s){
   var codes = [s.hp1r, s.hp2r, s.hp3r, s.hp4r].map(normalizeTKResultCode);
-  
-  var allEmptyOrZero = isHpEmptyOrZero(s.hp1, s.hp1r) &&
-                       isHpEmptyOrZero(s.hp2, s.hp2r) &&
-                       isHpEmptyOrZero(s.hp3, s.hp3r) &&
-                       isHpEmptyOrZero(s.hp4, s.hp4r);
-  if(allEmptyOrZero) return 'chua_hoc';
-  
-  // Vắng thi (VT) — thống kê riêng
-  if(codes.indexOf('VT') >= 0) return 'vt';
-  if(hasAnyBLDScoreBelow5(s)) return 'hong';
-  
-  // Đình chỉ (DC)
-  if(codes.indexOf('DC') >= 0) return 'dc';
-  
-  // Cấm thi (CT)
+
+  // If all HPs are empty (no numeric score and no raw marker) -> chưa học
+  var allEmpty = [1,2,3,4].every(function(i){
+    var sc = s['hp'+i];
+    var raw = s['hp'+i+'r'];
+    return (sc === null || sc === undefined) && String(raw||'').trim() === '';
+  });
+  if(allEmpty) return 'chua_hoc';
+
+  // Priority: codes from raw text
   if(codes.indexOf('CT') >= 0) return 'ct';
-  
+  if(codes.indexOf('DC') >= 0) return 'dc';
+  if(codes.indexOf('VT') >= 0) return 'vt';
+
+  // If any numeric score === 0 or raw '0' treat as VT
+  for(var i=1;i<=4;i++){
+    var sc = s['hp'+i];
+    var raw = String(s['hp'+i+'r']||'').trim();
+    if(Number.isFinite(Number(sc)) && Number(sc) === 0) return 'vt';
+    if(raw === '0') return 'vt';
+  }
+
+  // Any numeric score below 5 -> hỏng
+  if(hasAnyBLDScoreBelow5(s)) return 'hong';
+
   var tb = calcBLDTB(s);
   if(tb === null) return 'hong';
-  
+
   if(tb >= 9)  return 'sx';
   if(tb >= 8)  return 'g';
   if(tb >= 7)  return 'kha';
@@ -283,14 +293,15 @@ function categoryBGD(s){
   if(code==='CT') return 'ct';
   if(code==='DC') return 'dc';
   if(code==='VT') return 'vt';
-  
+
   var rawStr = String(s.raw || '').trim();
-  var isZeroOrEmpty = (s.score === null || s.score === undefined || s.score === 0 || rawStr === '' || rawStr === '0');
-  if (isZeroOrEmpty) {
+  // If raw empty and no numeric score -> chưa học
+  if((s.score === null || s.score === undefined || rawStr === '') ){
     return 'chua_hoc';
   }
-  
+
   var score = Number(s.score);
+  if(Number.isFinite(score) && score === 0) return 'vt';
   if(!Number.isFinite(score)) return 'hong';
   if(score >= 9)  return 'sx';
   if(score >= 8)  return 'g';
@@ -899,7 +910,7 @@ function appendResultListSheet(wb, rows, sheetName, title){
   var primaryLabel = getTKPrimaryLabel();
   var aoa = [
     [title],
-    ['Chế độ', tkMode === 'bld' ? 'BGD' : 'BLD'],
+    ['Chế độ', tkMode === 'bld' ? 'BLD' : 'BGD'],
     ['Tổng số', rows.length],
     [],
     [primaryLabel, 'Mã lớp', 'MSSV', 'Họ lót', 'Tên', 'Học phần chưa đạt', 'Ghi chú'],
@@ -931,6 +942,14 @@ function exportTKBanList(){
     return;
   }
 
+  // Sync tkMode with UI selection if present to avoid mismatch between displayed mode and internal state
+  try{
+    var uiModeEl = document.getElementById('tkModeSelect');
+    if(uiModeEl && uiModeEl.value){
+      tkMode = (uiModeEl.value === 'bgd') ? 'bgd' : 'bld';
+    }
+  }catch(e){}
+
   // Rebuild datasets/selection first to ensure tkByLop / tkSelected are populated
   try{ applyTKFilters(); }catch(e){}
 
@@ -956,6 +975,31 @@ function exportTKBanList(){
   var suspendedRows = collectStudentsByResultCode('dc');
   var failedRows = collectStudentsByResultCode('hong');
   var chuaHocRows = collectStudentsByResultCode('chua_hoc');
+
+  // Fallback: if all lists are empty but stats indicate there are problematic students,
+  // rebuild lists directly from tkByLop to ensure export works.
+  var allEmpty = !(bannedRows.length || absentRows.length || suspendedRows.length || failedRows.length || chuaHocRows.length);
+  var stats = statsFromSelection();
+  var anyIssues = (stats.ct + stats.vt + stats.dc + stats.hong + stats.chua_hoc) > 0;
+  if(allEmpty && anyIssues){
+    try{ console.log('exportTKBanList: fallback rebuild from tkByLop'); }catch(e){}
+    bannedRows = []; absentRows = []; suspendedRows = []; failedRows = []; chuaHocRows = [];
+    [...tkSelected].sort().forEach(function(key){
+      var group = tkByLop[key];
+      if(!group || !Array.isArray(group.students)) return;
+      group.students.forEach(function(s){
+        var c = (tkMode === 'bld') ? categoryBLD(s) : categoryBGD(s);
+        var maMHText = (tkMode === 'bld') ? getBLDFailedSubjectsText(s) : (s.maMH || '');
+        var ghiChu = (tkMode === 'bld') ? (s.hp1r||s.hp2r||s.hp3r||s.hp4r||'') : (s.raw||'');
+        var row = [key, s.maLop||'', s.maSV||'', s.hoLot||'', s.ten||'', maMHText, ghiChu];
+        if(c === 'ct') bannedRows.push(row);
+        else if(c === 'vt') absentRows.push(row);
+        else if(c === 'dc') suspendedRows.push(row);
+        else if(c === 'hong') failedRows.push(row);
+        else if(c === 'chua_hoc') chuaHocRows.push(row);
+      });
+    });
+  }
 
   // Debug logging: counts for each category (stringified for easier copy)
   try{
@@ -988,7 +1032,26 @@ function exportTKBanList(){
   var totalRows = mergedRows.length;
   try{ console.log('exportTKBanList mergedRows length:', totalRows, 'sample:', mergedRows.slice(0,6)); }catch(e){}
   if(!totalRows){
-    if(typeof setStatus === 'function') setStatus('Không có sinh viên CT/VT/DC/Hỏng/Chưa học trong lựa chọn hiện tại', 'warn');
+    try{ console.log('exportTKBanList: no merged rows, creating diagnostic sheet'); }catch(e){}
+    // Create a diagnostic sheet listing all students and their computed categories to help debugging
+    try{
+      var diagRows = [['Lớp','MSSV','Họ lót','Tên','HP1','HP1r','HP2','HP2r','HP3','HP3r','HP4','HP4r','Category']];
+      [...tkSelected].sort().forEach(function(key){
+        var group = tkByLop[key];
+        if(!group || !Array.isArray(group.students)) return;
+        group.students.forEach(function(s){
+          var cat = (tkMode === 'bld') ? categoryBLD(s) : categoryBGD(s);
+          diagRows.push([key, s.maSV||'', s.hoLot||'', s.ten||'', s.hp1, s.hp1r||'', s.hp2, s.hp2r||'', s.hp3, s.hp3r||'', s.hp4, s.hp4r||'', cat]);
+        });
+      });
+      var wbDiag = XLSX.utils.book_new();
+      var wsDiag = XLSX.utils.aoa_to_sheet(diagRows);
+      wsDiag['!cols'] = [{wch:18},{wch:12},{wch:20},{wch:12},{wch:6},{wch:8},{wch:6},{wch:8},{wch:6},{wch:8},{wch:6},{wch:8},{wch:12}];
+      XLSX.utils.book_append_sheet(wbDiag, wsDiag, 'Diagnostic_AllStudents');
+      var fnDiag = 'diagnostic_export_' + (tkMode === 'bld' ? 'BLD' : 'BGD') + '_' + (new Date().toISOString().slice(0,10)) + '.xlsx';
+      XLSX.writeFile(wbDiag, fnDiag, {bookSST:false, type:'binary'});
+      if(typeof setStatus === 'function') setStatus('Không có sinh viên CT/VT/DC/Hỏng/Chưa học — đã xuất file chẩn đoán: ' + fnDiag, 'warn');
+    }catch(e){ if(typeof setStatus === 'function') setStatus('Không có dữ liệu để xuất và không thể tạo file chẩn đoán.', 'warn'); }
     return;
   }
 
@@ -1000,7 +1063,7 @@ function exportTKBanList(){
 
   var wb = XLSX.utils.book_new();
   var primaryLabel = getTKPrimaryLabel();
-  var modeLabel = tkMode === 'bld' ? 'BGD' : 'BLD';
+  var modeLabel = tkMode === 'bld' ? 'BLD' : 'BGD';
   var selectedClassText = selectedKeys.length === 1 ? selectedKeys[0] : selectedKeys.join(', ');
 
   var aoa = [
@@ -1108,14 +1171,14 @@ function exportTKBanList(){
 
   var d = new Date();
   var fn = 'DanhSach_CT_VT_DC_' +
-    (tkMode === 'bld' ? 'BGD_' : 'BLD_') +
+    (tkMode === 'bld' ? 'BLD_' : 'BGD_') +
     d.getFullYear() +
     String(d.getMonth()+1).padStart(2,'0') +
     String(d.getDate()).padStart(2,'0') +
     '.xlsx';
 
   XLSX.writeFile(wb, fn, {bookSST:false, type:'binary'});
-  if(typeof setStatus === 'function') setStatus('Đã xuất danh sách BGD với VT + Hỏng chung 1 sheet theo lựa chọn hiện tại', 'ok');
+  if(typeof setStatus === 'function') setStatus('Đã xuất danh sách ' + modeLabel + ' với VT + Hỏng chung 1 sheet theo lựa chọn hiện tại', 'ok');
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1134,7 +1197,7 @@ function exportTK(){
 
   var pass = s.sx+s.g+s.kha+s.tb;
   var fail = s.ct+s.vt+s.dc+s.hong+s.chua_hoc;
-  var modeLabel = (tkMode === 'bld') ? 'BGD' : 'BLD';
+  var modeLabel = (tkMode === 'bld') ? 'BLD' : 'BGD';
 
   /* Lấy thông tin lọc để ghi vào header */
   var schoolEl   = document.getElementById('tkSchoolSelect');

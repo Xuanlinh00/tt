@@ -563,10 +563,12 @@ function renderMSSVList(q=''){
       renderList(document.getElementById('searchInput').value);
       renderTags();
       renderTabs();
-      renderQDTabs();
-      showMsg(` Đã chọn lớp <b>${item.maLop}</b> từ MSSV <b>${item.maSV}</b>.`,'ok');
-    });
-    frag.appendChild(el);
+  applyRangeStyle(ws, fi2+1, fi2+1, 0, 9, {
+    font: { name: 'Times New Roman', sz: 11, italic: true },
+    alignment: { horizontal: 'left', vertical: 'center', wrapText: true }
+  });
+  // center signature columns
+  centerSheetCells(ws, fi2+3, fi2+3, [0,4,9]);
   });
   list.appendChild(frag);
   renderMSSVDetailPanel();
@@ -698,25 +700,17 @@ function exportQuyetDinhMSSV(){
   const fi2=aoa.length; aoa.push([]);
   aoa.push(['Trên danh sách có '+list.length+' sinh viên','','','','','','','','','']);
   aoa.push([]);
-  const signerTitleText = String(chucVu || '').replace(' - ', '\n');
-  aoa.push(['','','','','','',signerTitleText,'','','']);
-  aoa.push([]);aoa.push([]);aoa.push([]);
-  aoa.push(['','','','','','',nguoiKy,'','','']);
 
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  const signerTitleRow = fi2 + 3;
-  const signerNameRow = fi2 + 7;
   ws['!merges']=[
     M(0,0,0,4),M(0,5,0,9), M(1,0,1,4),M(1,5,1,9), M(2,0,2,4),M(2,5,2,9),
     M(4,0,4,9),M(5,0,5,9),
-    M(fi2+1,0,fi2+1,9),
-    M(signerTitleRow,6,signerTitleRow,9),
-    M(signerNameRow,6,signerNameRow,9),
+    M(fi2+1,0,fi2+1,9)
   ];
   setRowHeights(ws, [
     {row:0, hpt:20}, {row:1, hpt:20}, {row:2, hpt:20},
     {row:4, hpt:24}, {row:5, hpt:20}, {row:7, hpt:30},
-    {row:fi2+1, hpt:18}, {row:signerTitleRow, hpt:32}, {row:signerNameRow, hpt:18}
+    {row:fi2+1, hpt:18}
   ]);
 
   const borderStyle = {
@@ -789,19 +783,6 @@ function exportQuyetDinhMSSV(){
     font: { name: 'Times New Roman', sz: 11, italic: true },
     alignment: { horizontal: 'left', vertical: 'center', wrapText: true }
   });
-  applyRangeStyle(ws, signerTitleRow, signerNameRow, 0, 9, {
-    font: { name: 'Times New Roman', sz: 11 },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-  });
-  applyRangeStyle(ws, signerTitleRow, signerTitleRow, 0, 9, {
-    font: { name: 'Times New Roman', sz: 11, bold: true },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-  });
-  applyRangeStyle(ws, signerNameRow, signerNameRow, 0, 9, {
-    font: { name: 'Times New Roman', sz: 11, bold: true },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-  });
-  centerSheetCells(ws, signerTitleRow, signerNameRow, [6]);
   XLSX.utils.book_append_sheet(wb,ws, 'TongHop_QD_MSSV');
 
   const t=new Date();
@@ -853,7 +834,14 @@ function renderTags(){
   [...selLop].sort().forEach(k=>{
     const tag=document.createElement('div');
     tag.className='sel-tag';
-    tag.innerHTML=`${k}<span class="rm" title="Bỏ chọn" onclick="removeLop('${k}')"></span>`;
+    const label=document.createElement('span');
+    label.textContent=k;
+    const remove=document.createElement('span');
+    remove.className='rm';
+    remove.title='Bỏ chọn';
+    remove.addEventListener('click', ()=>removeLop(k));
+    tag.appendChild(label);
+    tag.appendChild(remove);
     wrap.appendChild(tag);
   });
 }
@@ -1219,10 +1207,9 @@ function exportExcel(scope='all'){
     aoa.push(['','Số sinh viên đạt:','','',  dat,            'sinh viên/học sinh','','','','','','','','']);
     aoa.push(['','Số sinh viên hỏng:','','', hong,            'sinh viên/học sinh','','','','','','','','']);
     aoa.push([]);
-    aoa.push(['Cán bộ ghi điểm','','','','Phòng ĐT, QLSV','','','','','KT. GIÁM ĐỐC','','','','']);
-    aoa.push(['','','','','','','','','','PHÓ GIÁM ĐỐC','','','','']);
+    aoa.push(['Cán bộ ghi điểm','','','','Phòng ĐT, QLSV','','','','','KT. GIÁM ĐỐC PHÓ GIÁM ĐỐC','','','']);
     aoa.push([]);aoa.push([]);aoa.push([]);
-    aoa.push(['Trương Tấn Tài','','','','Cao Nguyên Ty','','','','','Trương Minh Hải','','','','']);
+    aoa.push(['Trương Tấn Tài','','','','Cao Nguyên Ty','','','','','Trương Minh Hải','','','']);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const sigTitleRow = ni + 5;
@@ -1416,25 +1403,17 @@ function exportQuyetDinh(scope='all'){
   const fi2=aoa.length; aoa.push([]);
   aoa.push(['Trên danh sách có '+list.length+' sinh viên','','','','','','','','','']);
   aoa.push([]);
-  const signerTitleText = String(chucVu || '').replace(' - ', '\n');
-  aoa.push(['','','','','','',signerTitleText,'','','']);
-  aoa.push([]);aoa.push([]);aoa.push([]);
-  aoa.push(['','','','','','',nguoiKy,'','','']);
 
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  const signerTitleRow = fi2 + 3;
-  const signerNameRow = fi2 + 7;
   ws['!merges']=[
     M(0,0,0,4),M(0,5,0,9), M(1,0,1,4),M(1,5,1,9), M(2,0,2,4),M(2,5,2,9),
     M(4,0,4,9),M(5,0,5,9),
-    M(fi2+1,0,fi2+1,9),
-    M(signerTitleRow,6,signerTitleRow,9),
-    M(signerNameRow,6,signerNameRow,9),
+    M(fi2+1,0,fi2+1,9)
   ];
   setRowHeights(ws, [
     {row:0, hpt:20}, {row:1, hpt:20}, {row:2, hpt:20},
     {row:4, hpt:24}, {row:5, hpt:20}, {row:7, hpt:30},
-    {row:fi2+1, hpt:18}, {row:signerTitleRow, hpt:32}, {row:signerNameRow, hpt:18}
+    {row:fi2+1, hpt:18}
   ]);
 
   const borderStyle = {
@@ -1511,19 +1490,6 @@ function exportQuyetDinh(scope='all'){
     font: { name: 'Arial', sz: 11, italic: true },
     alignment: { horizontal: 'left', vertical: 'center', wrapText: true }
   });
-  applyRangeStyle(ws, signerTitleRow, signerNameRow, 0, 9, {
-    font: { name: 'Arial', sz: 11 },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-  });
-  applyRangeStyle(ws, signerTitleRow, signerTitleRow, 0, 9, {
-    font: { name: 'Arial', sz: 11, bold: true },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-  });
-  applyRangeStyle(ws, signerNameRow, signerNameRow, 0, 9, {
-    font: { name: 'Arial', sz: 11, bold: true },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-  });
-  centerSheetCells(ws, signerTitleRow, signerNameRow, [6]);
   XLSX.utils.book_append_sheet(wb,ws, 'TongHop_QD');
 
   const t=new Date();
