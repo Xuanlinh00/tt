@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Bảng Điểm</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="wrap">
+        <div class="container">
+
+        <section id="score-sheet" class="tab-content active card">
+            <div class="import-section" style="margin-bottom:16px">
+                <h2>Bảng Ghi Điểm BLD</h2>
+                
+            </div>
+
+            <div class="filter-section report-filters">
+                <div class="filter-field">
+                    <label for="reportSchoolFilter">Trường:</label>
+                    <select id="reportSchoolFilter">
+                        <option value="">-- Tự động theo dữ liệu --</option>
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label for="reportSubjectFilter">Mã Môn:</label>
+                    <select id="reportSubjectFilter">
+                        <option value="">-- Chọn Mã Môn --</option>
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label for="reportClassFilter">Nhóm/lớp:</label>
+                    <select id="reportClassFilter">
+                        <option value="">-- Tất Cả Lớp --</option>
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label for="searchInput">Chọn nhiều lớp:</label>
+                    <div class="search-box-wrap">
+                        <input id="searchInput" type="text" placeholder="Tìm lớp... (VD: DA21, CKA, N01)" autocomplete="off" />
+                        <span class="search-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2" />
+                                <path d="M16 16L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                        </span>
+                        <div id="classSearchList" class="class-search-list"></div>
+                    </div>
+                </div>
+
+                <div class="filter-field">
+                    <label for="studentSearchToggleBtn">Tìm mã số sinh viên:</label>
+                    <div class="student-search-wrap">
+                    <button id="studentSearchToggleBtn" class="filter-trigger-btn" type="button">Mở bộ lọc MSSV</button>
+                        <div id="studentSearchPanel" class="student-search-panel">
+                            <label for="studentCodesInput">Nhập nhiều MSSV (mỗi dòng một mã hoặc dán nhiều mã cách nhau bằng dấu phẩy / khoảng trắng):</label>
+                            <textarea id="studentCodesInput" rows="6" placeholder="Ví dụ:
+2101010141
+2101020022
+2201010165
+2401010002"></textarea>
+                            <div id="studentCodeFilterInfo" class="student-code-filter-info"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-actions">
+                    <button id="selectAllClassBtn" class="btn btn-outline" type="button">Chọn tất cả</button>
+                    <button id="clearAllClassBtn" class="btn btn-outline-danger" type="button">Bỏ chọn</button>
+                    <button id="applyStudentCodesBtn" class="btn btn-outline" type="button">Áp dụng MSSV</button>
+                    <button id="clearStudentCodesBtn" class="btn btn-outline-danger" type="button">Xóa lọc MSSV</button>
+                </div>
+
+                <div class="export-actions">
+                    <button id="exportScoreSheetBtn" class="btn btn-primary" type="button">Xuất File Excel</button>
+                    <button id="exportDecisionBtn" class="btn btn-primary" type="button">Xuất Quyết Định/Chứng Chỉ</button>
+                </div>
+            </div>
+            <div id="classTags" class="class-tags"></div>
+            <div id="studentCodeTags" class="class-tags student-code-tags"></div>
+            <div id="reportContent" class="table-wrapper">
+                <p class="empty-message">Chưa có dữ liệu. Vui lòng nhập dữ liệu từ tab "Nhập Dữ Liệu"</p>
+            </div>
+        </section>
+
+        <select id="classFilter" hidden></select>
+        <select id="subjectFilter" hidden></select>
+        <div id="byClassContent" hidden></div>
+        <div id="bySubjectContent" hidden></div>
+        <div id="statisticsContent" hidden></div>
+    </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
